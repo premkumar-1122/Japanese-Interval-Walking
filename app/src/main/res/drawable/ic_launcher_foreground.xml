@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Left Outlined Footprint sole -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M38,26 C31.5,26 27,31 27,41 C27,49 29.5,52.5 35,52.5 C40.5,52.5 43,49 43,41 C43,31 41.5,26 38,26 Z" />
+    
+    <!-- Left Outlined Footprint heel -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M35,60 C31.5,60 30,64 30,69 C30,74 31.5,76 35,76 C38.5,76 40,74 40,69 C40,64 38.5,60 35,60 Z" />
+
+    <!-- Right Outlined Footprint sole (slightly lower and further right) -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M65,38 C58.5,38 54,43 54,53 C54,61 56.5,64.5 62,64.5 C67.5,64.5 70,61 70,53 C70,43 68.5,38 65,38 Z" />
+    
+    <!-- Right Outlined Footprint heel -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M62,72 C58.5,72 57,76 57,81 C57,86 58.5,88 62,88 C65.5,88 67,86 67,81 C67,76 65.5,72 62,72 Z" />
+
+</vector>

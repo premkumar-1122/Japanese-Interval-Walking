@@ -1,0 +1,6 @@
+{
+  "name": "Japanese Interval Walking",
+  "description": "Premium sports-themed Japanese Interval Walking app inspired by Nike and Strava. Seamless step tracking, pace, dynamic cadence, and calorie monitoring with real-time TTS voice coach, local Room persistence, offline syncing, light/dark mode, and persistent background service tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

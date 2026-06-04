@@ -6,7 +6,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -40,21 +41,24 @@ class MainActivity : ComponentActivity() {
             val isOnboardingCompleted by viewModel.isOnboardingCompleted.collectAsStateWithLifecycle()
 
             MyApplicationTheme(darkTheme = isDarkTheme) {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     if (!isOnboardingCompleted) {
                         com.example.ui.screens.OnboardingScreen(
                             viewModel = viewModel,
                             onOnboardingFinished = {
                                 viewModel.setOnboardingCompleted(true)
                             },
-                            modifier = Modifier.padding(innerPadding)
+                            modifier = Modifier.fillMaxSize()
                         )
                     } else {
                         DashboardScreen(
                             viewModel = viewModel,
                             isDarkTheme = isDarkTheme,
                             onThemeToggle = { viewModel.toggleTheme() },
-                            modifier = Modifier.padding(innerPadding)
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                 }

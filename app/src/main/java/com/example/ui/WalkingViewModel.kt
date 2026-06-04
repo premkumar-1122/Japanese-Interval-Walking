@@ -442,11 +442,11 @@ class WalkingViewModel(
         }
 
         val jpBody = """
-            🏃 【インターバル速歩トレーニング記録】
+            [インターバル速歩 トレーニング記録]
             
             3分ずつの「ゆっくり歩き」と「早歩き」を交互に繰り返す科学的フィットネスを完了しました！
             
-            📊 運動統計:
+            [運動統計]
             - 総歩数: ${session.steps} 歩
             - 消費カロリー: ${String.format("%.1f", session.calories)} kcal
             - 運動時間: $durationStr 分
@@ -454,15 +454,15 @@ class WalkingViewModel(
             - 平均ペース: ${String.format("%.1f", session.avgPace)} 分/km
             - インターバル回数: ${session.totalCycles} サイクル (${session.slowCyclesCount}x低速, ${session.fastCyclesCount}x高速)
             
-            📱 App: #JapaneseIntervalWalking
+            [トラッカー] #JapaneseIntervalWalking
         """.trimIndent()
 
         val enBody = """
-            🏃 【Japanese Interval Walking Record】
+            [Japanese Interval Walking Record]
             
             Scientific alternating 3-min fast / 3-min slow walking workout has been successfully registered!
             
-            📊 Workout Stats:
+            [Workout Stats]
             - Steps Taken: ${session.steps} steps
             - Calories Burned: ${String.format("%.1f", session.calories)} kcal
             - Walking Duration: $durationStr min
@@ -470,7 +470,7 @@ class WalkingViewModel(
             - Average Pace: ${String.format("%.1f", session.avgPace)} min/km
             - Total Intervals: ${session.totalCycles} cycles (${session.slowCyclesCount}x recovery, ${session.fastCyclesCount}x peak)
             
-            📱 Tracking App: #JapaneseIntervalWalking
+            [Tracker App] #JapaneseIntervalWalking
         """.trimIndent()
 
         return title to (if (_isJpLanguage.value) jpBody else enBody)

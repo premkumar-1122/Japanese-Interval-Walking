@@ -25,6 +25,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.*
 
+data class CompletedSessionData(
+    val steps: Int,
+    val calories: Double,
+    val durationSeconds: Long,
+    val slowCyclesCount: Int,
+    val fastCyclesCount: Int,
+    val totalCycles: Int,
+    val avgCadence: Double,
+    val avgPace: Double,
+    val dateMillis: Long
+)
+
 class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.OnInitListener {
 
     companion object {
@@ -40,6 +52,13 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
         // Active State of Current Session, reachable directly by UI ViewModels
         private val _currentState = MutableStateFlow<ServiceState>(ServiceState.Idle)
         val currentState: StateFlow<ServiceState> = _currentState
+
+        private val _completedSession = MutableStateFlow<CompletedSessionData?>(null)
+        val completedSession: StateFlow<CompletedSessionData?> = _completedSession
+
+        fun clearCompletedSession() {
+            _completedSession.value = null
+        }
 
         // Toggle properties configured by Settings (defaults)
         var slowDurationMinutes: Int = 3
@@ -382,23 +401,37 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
         _currentState.value = ServiceState.Idle
 
         if (saveToDb && record.steps > 0) {
+            val totalDistanceKm = (record.steps.toDouble() * 0.72) / 1000.0
+            val durationMinutes = record.elapsedTotalSeconds.toDouble() / 60.0
+            val calculatedAvgPace = if (totalDistanceKm > 0.0) (durationMinutes / totalDistanceKm) else 0.0
+            val avgCadInstance = if (record.elapsedTotalSeconds > 0) (record.steps.toDouble() / (record.elapsedTotalSeconds.toDouble() / 60.0)) else 0.0
+
+            val completedData = CompletedSessionData(
+                steps = record.steps,
+                calories = record.calories,
+                durationSeconds = record.elapsedTotalSeconds.toLong(),
+                slowCyclesCount = record.slowCyclesCompleted,
+                fastCyclesCount = record.fastCyclesCompleted,
+                totalCycles = record.currentCycle,
+                avgCadence = avgCadInstance,
+                avgPace = calculatedAvgPace,
+                dateMillis = System.currentTimeMillis()
+            )
+            _completedSession.value = completedData
+
             serviceScope.launch {
                 val db = AppDatabase.getDatabase(applicationContext)
                 val repo = WalkingRepository(db.walkingSessionDao())
-                val totalDistanceKm = (record.steps.toDouble() * 0.72) / 1000.0
-                val durationMinutes = record.elapsedTotalSeconds.toDouble() / 60.0
-                val calculatedAvgPace = if (totalDistanceKm > 0.0) (durationMinutes / totalDistanceKm) else 0.0
-
                 val session = WalkingSession(
-                    dateMillis = System.currentTimeMillis(),
-                    durationSeconds = record.elapsedTotalSeconds.toLong(),
-                    steps = record.steps,
-                    calories = record.calories,
-                    avgCadence = if (record.elapsedTotalSeconds > 0) (record.steps.toDouble() / (record.elapsedTotalSeconds.toDouble() / 60.0)) else 0.0,
-                    avgPace = calculatedAvgPace,
-                    slowCyclesCount = record.slowCyclesCompleted,
-                    fastCyclesCount = record.fastCyclesCompleted,
-                    totalCycles = record.currentCycle,
+                    dateMillis = completedData.dateMillis,
+                    durationSeconds = completedData.durationSeconds,
+                    steps = completedData.steps,
+                    calories = completedData.calories,
+                    avgCadence = completedData.avgCadence,
+                    avgPace = completedData.avgPace,
+                    slowCyclesCount = completedData.slowCyclesCount,
+                    fastCyclesCount = completedData.fastCyclesCount,
+                    totalCycles = completedData.totalCycles,
                     isSyncedToGoogleFit = false,
                     isSyncedToHealthConnect = false
                 )
@@ -407,7 +440,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
             }
         }
 
-        speakCue(if (isJpLanguage) "お疲れ様でした。トレーニングが終了しました。" else "Workout completed. Excellent training session!")
+        speakCue("Session completed")
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -612,6 +645,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
             englishText.contains("Next interval") -> "次の区間へ移行します。"
             englishText.contains("Slow interval complete") -> "ゆっくり歩き終了です。ギヤを上げて、3分間の早歩きを始めましょう！"
             englishText.contains("Fast interval complete") -> "早歩きが終了しました。息を整えながら、ゆっくりマイペースで歩きましょう。"
+            englishText.contains("Session completed") -> "セッションが自動完了しました。お疲れ様でした。"
             englishText.contains("Workout completed") -> "お疲れ様でした！インターバルトレーニングが完了しました。素晴らしい運動量です。"
             else -> englishText
         }

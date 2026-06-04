@@ -6,11 +6,15 @@ import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -150,7 +154,8 @@ fun DashboardScreen(
 
     Scaffold(
         topBar = {
-            if (!isTrackingActive) {
+            val completedData by WalkingForegroundService.completedSession.collectAsStateWithLifecycle()
+            if (!isTrackingActive && completedData == null) {
                 TopAppBar(
                     title = {
                         Column(modifier = Modifier.padding(start = 4.dp)) {
@@ -174,38 +179,42 @@ fun DashboardScreen(
                         }
                     },
                     actions = {
-                        // Multi-language quick switch styling matching layout buttons
-                        IconButton(
-                            onClick = { viewModel.toggleLanguage() },
-                            modifier = Modifier
-                                .padding(end = 6.dp)
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(end = 12.dp)
                         ) {
-                            Text(
-                                text = if (isJp) "EN" else "JA",
-                                fontWeight = FontWeight.Black,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 11.sp
-                            )
-                        }
-                        
-                        // Eco battery Light/Dark theme toggle styling
-                        IconButton(
-                            onClick = onThemeToggle,
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
-                        ) {
-                            Icon(
-                                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                contentDescription = "Toggle Theme",
-                                tint = if (isDarkTheme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            // Multi-language quick switch styling matching layout buttons
+                            IconButton(
+                                onClick = { viewModel.toggleLanguage() },
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Text(
+                                    text = if (isJp) "EN" else "JA",
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            
+                            // Eco battery Light/Dark theme toggle styling
+                            IconButton(
+                                onClick = onThemeToggle,
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Icon(
+                                    imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = "Toggle Theme",
+                                    tint = if (isDarkTheme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -215,7 +224,8 @@ fun DashboardScreen(
             }
         },
         bottomBar = {
-            if (!isTrackingActive) {
+            val completedData by WalkingForegroundService.completedSession.collectAsStateWithLifecycle()
+            if (!isTrackingActive && completedData == null) {
                 val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
                 val navBgColor = if (isLightMode) Color(0xFFEDF3E7) else MaterialTheme.colorScheme.surface
                 val activePillColor = if (isLightMode) Color(0xFF5FAF35) else MaterialTheme.colorScheme.primary
@@ -225,7 +235,8 @@ fun DashboardScreen(
                 NavigationBar(
                     containerColor = navBgColor,
                     tonalElevation = 12.dp,
-                    windowInsets = WindowInsets.navigationBars
+                    windowInsets = WindowInsets.navigationBars,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     val items = listOf(
                         Triple(
@@ -234,7 +245,7 @@ fun DashboardScreen(
                             0
                         ),
                         Triple(
-                            if (isJp) "パーソナル記録" else "DASHBOARD", 
+                            if (isJp) "データ履歴" else "DASHBOARD", 
                             Icons.Default.Analytics, 
                             1
                         ),
@@ -244,21 +255,23 @@ fun DashboardScreen(
                             2
                         ),
                         Triple(
-                            if (isJp) "ギヤ設定" else "SETTINGS", 
+                            if (isJp) "ギア設定" else "SETTINGS", 
                             Icons.Default.Settings, 
                             3
                         )
                     )
+                    // Wait, let's keep the exact same item tuples as they were to maintain functionality!
+
                     
                     items.forEach { (label, icon, index) ->
                         NavigationBarItem(
                             selected = selectedTab == index,
                             onClick = { selectedTab = index },
-                            icon = { Icon(imageVector = icon, contentDescription = label) },
+                            icon = { Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(20.dp)) },
                             label = { 
                                 Text(
                                     text = label, 
-                                    fontSize = 10.sp, 
+                                    fontSize = 9.sp, 
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -266,7 +279,7 @@ fun DashboardScreen(
                             },
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = activeContentColor,
-                                selectedTextColor = activeContentColor,
+                                selectedTextColor = if (isLightMode) Color(0xFF111111) else MaterialTheme.colorScheme.primary,
                                 indicatorColor = activePillColor,
                                 unselectedIconColor = inactiveColor,
                                 unselectedTextColor = inactiveColor
@@ -286,7 +299,18 @@ fun DashboardScreen(
         ) {
             // Screen rendering navigation
             val state = currentServiceState
-            if (state is WalkingForegroundService.ServiceState.Active) {
+            val completedSessionData by WalkingForegroundService.completedSession.collectAsStateWithLifecycle()
+
+            if (completedSessionData != null) {
+                SessionCompletionScreen(
+                    data = completedSessionData!!,
+                    isJp = isJp,
+                    onGoToDashboard = {
+                        selectedTab = 1
+                        WalkingForegroundService.clearCompletedSession()
+                    }
+                )
+            } else if (state is WalkingForegroundService.ServiceState.Active) {
                 TrackingHudView(
                     state = state,
                     viewModel = viewModel,
@@ -674,7 +698,10 @@ fun DashboardStatsTabScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.CloudSync, 
                                 contentDescription = "Sync status", 
@@ -686,24 +713,25 @@ fun DashboardStatsTabScreen(
                                 text = if (isJp) "Android ヘルスコネクト連携" else "Android Health Connect Sync",
                                 fontWeight = FontWeight.Black,
                                 fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                         }
                         
+                        Spacer(modifier = Modifier.width(6.dp))
+
                         // Redesigned compact status chip using theme variables and soft containers
                         val (statusText, statusBg, statusColor) = when (sdkStatus) {
                             androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE -> {
                                 if (hasHCPermissions) {
                                     Triple(
                                         if (isJp) "接続中" else "Connected",
-                                        SystemSuccess.copy(alpha = 0.15f),
+                                        SystemSuccess.copy(alpha = 0.12f),
                                         SystemSuccess
                                     )
                                 } else {
                                     Triple(
                                         if (isJp) "アクセス許可が必要" else "Permissions Required",
-                                        SystemWarning.copy(alpha = 0.15f),
+                                        SystemWarning.copy(alpha = 0.12f),
                                         SystemWarning
                                     )
                                 }
@@ -711,14 +739,14 @@ fun DashboardStatsTabScreen(
                             androidx.health.connect.client.HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
                                 Triple(
                                     if (isJp) "更新が必要" else "Update Required",
-                                    SystemWarning.copy(alpha = 0.15f),
+                                    SystemWarning.copy(alpha = 0.12f),
                                     SystemWarning
                                 )
                             }
                             else -> {
                                 Triple(
                                     if (isJp) "非対応" else "Not Supported",
-                                    SystemError.copy(alpha = 0.15f),
+                                    SystemError.copy(alpha = 0.12f),
                                     SystemError
                                 )
                             }
@@ -727,9 +755,11 @@ fun DashboardStatsTabScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(statusBg)
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .border(1.dp, statusColor.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Box(
                                 modifier = Modifier
@@ -737,12 +767,11 @@ fun DashboardStatsTabScreen(
                                     .clip(CircleShape)
                                     .background(statusColor)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = statusText,
                                 color = statusColor,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Black
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
@@ -1258,92 +1287,92 @@ fun TechniqueTabScreen(isJp: Boolean) {
 
     val chapters = listOf(
         GuideChapter(
-            titleEn = "Standard Posture Mechanics",
-            titleJp = "正しい基本フォーム",
+            titleEn = "1. Simple & Easy Posture",
+            titleJp = "1. かんたん正しい姿勢",
             icon = Icons.Default.AccessibilityNew,
             tipsEn = listOf(
-                "Stand totally tall and look directly forward ahead. Do not scan down towards your feet.",
-                "Keep your shoulders rolled back, completely relaxed, and far away from ears.",
-                "Contract core stomach muscles comfortably to release strain from the lower spine.",
-                "Maintain ears directly vertically aligned with shoulders, hips, and ankle joints."
+                "Look straight ahead comfortably (about 10 to 20 steps in front of you). Try not to look down at your feet.",
+                "Relax your shoulders and keep your chest open. Let your arms swing naturally.",
+                "Stand tall but loose. Keep your back straight without tensing up.",
+                "Ensure your body feels light and balanced from head to toe, letting you walk further without feeling tired."
             ),
             tipsJp = listOf(
-                "25メートル先を見るように前を向き、顎を引き、背筋をまっすぐに伸ばします。下を見ないでください。",
-                "肩に余計な力が入らないよう脱力させ、胸をリラックスして開き、お腹を軽く引き締めます。",
-                "これにより腰への負担を減らし、スピードを出した際にも安定した重心移動を維持できます。",
-                "耳、肩、腰、そしてくるぶしが横から見て垂直の一本線になるようニュートラルに直立します。"
+                "10歩から20歩ほど先の少し遠くを見るように、すっきりとまっすぐ前を向いて歩きましょう。下は見すぎないようにします。",
+                "肩の力をふっと抜いて、胸を軽く開きます。こうすると呼吸がぐっと楽になります。",
+                "背すじを優しくすっと伸ばします。お腹をほんの少し意識すると、腰が痛くなりにくく安定します。",
+                "頭のてっぺんから足の裏まで、一本の軸が通っているようなイメージで、軽やかに立ちます。"
             )
         ),
         GuideChapter(
-            titleEn = "Stride & Active Foot strike",
-            titleJp = "歩幅と着地のテクニック",
+            titleEn = "2. Smart Steps & Landing",
+            titleJp = "2. 歩幅と足先のコツ",
             icon = Icons.AutoMirrored.Filled.DirectionsRun,
             tipsEn = listOf(
-                "During SLOW recovery walks: keep strides completely normal, natural, and low effort.",
-                "During FAST intervals: expand your stride by roughly 3-5 cm wider than standard walks.",
-                "Strike the pavement specifically with the heel first, then smoothly roll your weight toward the toes.",
-                "Forcefully kick off the asphalt utilizing specifically the big toe for sustained momentum.",
-                "Optimal target cadences: 90-100 spm (slow Recovery) and 130-150 spm (brisk Sprint)."
+                "During EASY walk intervals: Just walk at your usual, comfortable and relaxed pace.",
+                "During FAST walk intervals: Take slightly larger steps, about one finger-width wider than your normal step.",
+                "Land softly on your heels first, and let your body weight roll smoothly from heel to toe.",
+                "Push off the ground gently using your toes. This naturally moves you forward with less effort!",
+                "Listen to the app's sound or vibe indicators to know exactly when to shift between easy and fast walking."
             ),
             tipsJp = listOf(
-                "「ゆっくり歩き」区間では：普段通りのリラックスした歩幅と自然なスピードで歩きます。",
-                "「早歩き」区間では：いつもの歩幅よりさらに『大股一歩分、約3〜5cm』広く踏み出します。",
-                "必ず『かかと』から地面にソフトに着地し、つま先へとなめらかに体重移動を行います。",
-                "最後は『親指の指先（つま先）』でアスファルトを力強く押し出すようにキックします。",
-                "おすすめ目標ケイデンス：通常回収区間では90〜100歩/分、高強度区間で130〜150歩/分。"
+                "「ゆっくり歩く」時間：いつものお買い物と同じように、のんびりとリラックスして歩いて息を整えましょう。",
+                "「早歩き」時間：いつもの歩き方より、拳ひとつ分（ほんの3〜5センチ）大股で踏み出すように意識します。",
+                "足元は「かかと」から優しく着地し、足の裏全体を転がすように、つま先へと滑らかに体重を移動させます。",
+                "地面を蹴るときは、足の指先で優しく押し出すイメージ。これだけで驚くほど足が前に進みます。",
+                "アプリがタイミングを教えてくれるので、音やスマートフォンの振動に合わせて気軽に切り替えるだけでOKです。"
             )
         ),
         GuideChapter(
-            titleEn = "Arm Movement",
-            titleJp = "効果的な腕の振り方",
+            titleEn = "3. Relaxed Arm Swinging",
+            titleJp = "3. 腕の軽いスイング",
             icon = Icons.Default.FitnessCenter,
             tipsEn = listOf(
-                "Keep elbow angles flexed directly at 90 degrees.",
-                "Drive arm rotations back-and-forth from shoulders rather than merely elbow flexing.",
-                "Avoid letting your fists move across your chest. Keep them aligned with standard walking lines.",
-                "Keep hands loosely enclosed relative to each other. Do not intensely clench fists.",
-                "Vigorous arm flexing automatically helps drive fast thigh muscle rotations."
+                "Bend your elbows slightly (around 90 degrees) to let them move efficiently.",
+                "Swing your arms backward gently from the shoulder. Think of pulling your shoulder blades back.",
+                "Keep your hands moving in a straight, comfortable forward-backward direction rather than crossing over your chest.",
+                "Don't squeeze your fists tightly. Keep your hands relaxed, as if gently holding a warm egg.",
+                "A natural, healthy arm swing automatically makes your legs move faster and lighter!"
             ),
             tipsJp = listOf(
-                "肘の角度は直角に近い『約90度』にしっかり曲げます。",
-                "肘単体ではなく、肩甲骨を後ろに引くように『肩からダイナミックに腕を振る』のが鉄則です。",
-                "腕を振る際、握り拳が胸を横切らないようにまっすぐ前後方向へ振る意識を持ちましょう。",
-                "手をガチガチの拳にせず、卵を軽く包み込むように自然にハーフオープンにします。",
-                "力強く大きく腕を振ることで、その反動が下半身を押し出し、大腿筋肉が高速で回転し出します。"
+                "肘は『約90度』に軽く曲げると、腕が振りやすく歩きやすくなります。",
+                "手先だけで振るのではなく、肩甲骨を後ろに引くように『肩の周りを大きく動かす運動』として腕を振ります。",
+                "腕は胸の前で交差させず、まっすぐ前後にリズムよくスイングすることを意識します。",
+                "拳をぎゅっと硬く握りしめず、小さなマシュマロか温かい卵をそっと持っているように手をゆるめます。",
+                "腕をしっかりスイングさせると、そのリズムに合わせて自然に歩幅が広がり、スピードが上がります。"
             )
         ),
         GuideChapter(
-            titleEn = "Deep Rhythmical Breathing",
-            titleJp = "深い呼吸法",
+            titleEn = "4. Natural Breathing Rhythm",
+            titleJp = "4. はずむ呼吸リズム",
             icon = Icons.Default.Air,
             tipsEn = listOf(
-                "Incorporate deep nasal breathing if possible to stabilize core heart telemetry.",
-                "Match breath cycles directly with steps. E.g. inhale for 3 paces, exhale for 3 paces.",
-                "Rely on diaphragmatic breathing (let stomach expand on inhale, contract on exhale).",
-                "Do not restrict breath intake while sprinting during the peak fast cycles."
+                "Breathe deeply through your nose and blow out softly through your mouth. This keeps your heart feeling calm and steady.",
+                "Try matching your breaths to your footsteps! For example: take 3 steps while inhaling, and then 3 steps while exhaling.",
+                "Let your belly expand comfortably when inhaling, and soften when you blow out.",
+                "Don't hold your breath! Keep breathing evenly and comfortably even when walking fast."
             ),
             tipsJp = listOf(
-                "できるだけ鼻から吸い、口から吐く深い腹式呼吸を取り入れ、心拍数の急激な上昇を抑えます。",
-                "歩数と呼吸リズムを同期させます。例：3歩進む間に鼻で吸い、続く3歩で口から吐ききります。",
-                "胸やお腹が動くインナーマッスル呼吸は酸素の摂取容量を高め、末梢血管の血流を良くします。",
-                "早歩きのような強運動中、絶対に呼吸を止めずに、常にリズミカルな酸素吸入をキープします。"
+                "鼻からゆっくり空気を吸い込み、お口からふーっと優しく吹き出す呼吸を行うと、心拍数が安定して楽に歩けます。",
+                "お好みのリズムで呼吸を歩数と合わせてみましょう。例：「3歩歩きながら吸う、次の3歩で吐き出す」",
+                "胸だけで息をせず、お腹を膨らませたり凹ませたりする深呼吸のようなお腹での呼吸がおすすめです。",
+                "早歩きのときも決して息を止めず、常に新鮮な空気を取り入れながらニコニコ歩けるペースを心がけます。"
             )
         ),
         GuideChapter(
-            titleEn = "Research & Benefits",
-            titleJp = "運動生理学と信州大学の成果",
+            titleEn = "5. Why 30 Mins Works So Well",
+            titleJp = "5. どうして30分で効果が出るの？",
             icon = Icons.Default.Science,
             tipsEn = listOf(
-                "Pioneered by Dr. Hiroshi Nose after over 5 months of strict control studies.",
-                "Interval walking prevents systemic lifestyle diseases such as high blood metrics.",
-                "Alternating stress variables triggers rapid mitochondria adaptation in leg muscles.",
-                "Standard steady state monotonic walking provides fewer cardiorespiratory adaptations."
+                "Designed based on medical research showing incredible health results in everyday life.",
+                "Instead of exhausting yourself with 10,000 steps a day, this 30-minute interval routine gives you the same premium fitness results.",
+                "Alternating easy and fast walks wakes up your leg muscles, boosts your metabolism, and leaves you feeling energetic!",
+                "Perfect for busy adults who want the absolute best benefits with zero gym fees and zero wasted time."
             ),
             tipsJp = listOf(
-                "信州大学医学部能勢博教授らによる5ヶ月間の臨床実験で実証された科学的メソッドです。",
-                "週4回、1回30分のインターバルトレーニングにより、生活習慣病 of 特有の指標値が大幅に低減。",
-                "緩急負荷が脚部筋肉細胞内のミトコンドリア活性化を引き起こし、筋力が著しく向上。",
-                "ただダラダラと1万歩歩くよりも、短い時間で飛躍的に高い健康効果と減量成果を生み出します。"
+                "信州大学医学部で長年研究され、多くの人々で効果が実証された健康に安全なメソッドに基づいています。",
+                "時間のない毎日でも、ジムに通わずに週に数回、1日わずか30分歩くだけで理想的な体力向上と健康維持を実感できます。",
+                "強弱をつける歩き方が眠っていた筋肉と代謝スイッチをパッとONにし、短時間で効果的に体脂肪を燃焼させます。",
+                "ただダラダラと1万歩を目標に歩くよりも、はるかに短時間で、身体が若々しく元気に生まれ変わります。"
             )
         )
     )
@@ -1357,14 +1386,14 @@ fun TechniqueTabScreen(isJp: Boolean) {
     ) {
         item {
             Text(
-                text = if (isJp) "歩行サイエンス解説" else "TRAINING ACADEMY",
+                text = if (isJp) "メリハリ歩き・基本ガイド" else "WALKING TIPS",
                 fontWeight = FontWeight.Black,
                 fontStyle = FontStyle.Italic,
                 fontSize = 28.sp,
                 letterSpacing = (-0.5).sp
             )
             Text(
-                text = if (isJp) "正しい歩き方をマスターして、運動効率を最大化する" else "Optimize biomechanics to maximize athletic efficiency",
+                text = if (isJp) "毎日をもっと元気に、たった30分で最高に楽しむコツ" else "Easy steps to stay extremely healthy and fit",
                 fontSize = 12.sp,
                 color = TextMutedGrey
             )
@@ -1567,8 +1596,11 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.secondary,
-                            letterSpacing = 1.sp
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f)
                         )
+
+                        Spacer(modifier = Modifier.width(6.dp))
 
                         // Redesigned status chip with separate light-theme compliance
                         val (statusText, statusBg, statusColor) = when (sdkStatus) {
@@ -1576,13 +1608,13 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
                                 if (hasHCPermissions) {
                                     Triple(
                                         if (isJp) "接続中" else "Connected",
-                                        SystemSuccess.copy(alpha = 0.15f),
+                                        SystemSuccess.copy(alpha = 0.12f),
                                         SystemSuccess
                                     )
                                 } else {
                                     Triple(
                                         if (isJp) "アクセス許可が必要" else "Permissions Required",
-                                        SystemWarning.copy(alpha = 0.15f),
+                                        SystemWarning.copy(alpha = 0.12f),
                                         SystemWarning
                                     )
                                 }
@@ -1590,14 +1622,14 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
                             androidx.health.connect.client.HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
                                 Triple(
                                     if (isJp) "更新が必要" else "Update Required",
-                                    SystemWarning.copy(alpha = 0.15f),
+                                    SystemWarning.copy(alpha = 0.12f),
                                     SystemWarning
                                 )
                             }
                             else -> {
                                 Triple(
                                     if (isJp) "非対応" else "Not Supported",
-                                    SystemError.copy(alpha = 0.15f),
+                                    SystemError.copy(alpha = 0.12f),
                                     SystemError
                                 )
                             }
@@ -1605,16 +1637,28 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
 
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(statusBg)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .border(1.dp, statusColor.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
                         ) {
-                            Text(
-                                text = statusText.uppercase(Locale.getDefault()),
-                                color = statusColor,
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(statusColor)
+                                )
+                                Text(
+                                    text = statusText.uppercase(Locale.getDefault()),
+                                    color = statusColor,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                     
@@ -1864,11 +1908,11 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
     if (showWeightDialog) {
         AlertDialog(
             onDismissRequest = { showWeightDialog = false },
-            title = { Text(if (isJp) "体重係数の入力" else "Calibrate Body Weight") },
+            title = { Text(if (isJp) "体重の設定" else "Set Your Body Weight") },
             text = {
                 Column {
                     Text(
-                        text = if (isJp) "科学的消費カロリー計算(METs)の精密化のために入力してください。体重(kg)：" else "Calibrating body mass parameters provides highly precise calories tracking equations (MET formulas):",
+                        text = if (isJp) "よりあなたの歩行状態に合わせた、正確な消費カロリーをスマートに計算します。体重(kg)：" else "Entering your body weight helps us estimate your burned calories accurately during your 30-minute walking sessions.",
                         fontSize = 12.sp,
                         color = TextMutedGrey,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -1895,7 +1939,7 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text(if (isJp) "保存" else "SAVE PARAMETER", color = Color.Black, fontWeight = FontWeight.Black)
+                    Text(if (isJp) "体重を保存" else "SAVE WEIGHT", color = Color.Black, fontWeight = FontWeight.Black)
                 }
             },
             dismissButton = {
@@ -2364,9 +2408,10 @@ fun TrackingHudView(
         modifier = Modifier
             .fillMaxSize()
             .background(phaseThemeBg)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 24.dp, vertical = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween
+        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // Hud top meta details
         Row(
@@ -2667,5 +2712,347 @@ fun HudTelemetryMetric(label: String, value: String, accentColor: Color) {
             color = accentColor,
             modifier = Modifier.padding(top = 2.dp)
         )
+    }
+}
+
+@Composable
+fun SessionCompletionScreen(
+    data: com.example.service.CompletedSessionData,
+    isJp: Boolean,
+    onGoToDashboard: () -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+    val rotateAnimation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(4000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotate"
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF071114)) // Elegant obsidian-emerald gym-tech dark background
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Large celebration checkmark with glowing concentric circles
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(140.dp)
+                .drawBehind {
+                    // Glowing outer ring radiating success aura
+                    drawCircle(
+                        color = SystemSuccess.copy(alpha = 0.15f * scale),
+                        radius = this.size.width / 2f
+                    )
+                    drawCircle(
+                        color = SystemSuccess.copy(alpha = 0.3f),
+                        radius = this.size.width / 2.5f
+                    )
+                }
+        ) {
+            // Draw floating confetti around checkmark
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val center = Offset(this.size.width / 2f, this.size.height / 2f)
+                val angles = listOf(30f, 75f, 120f, 165f, 210f, 255f, 300f, 345f)
+                val colors = listOf(SystemSuccess, RecoveryTeal, LaserCrimson, Color.Yellow, Color.Cyan)
+                
+                angles.forEachIndexed { i, baseAngle ->
+                    val angleRad = Math.toRadians((baseAngle + rotateAnimation).toDouble())
+                    val distance = (this.size.width / 2.1f) + (10f * scale)
+                    val x = center.x + (distance * Math.cos(angleRad).toFloat())
+                    val y = center.y + (distance * Math.sin(angleRad).toFloat())
+                    
+                    drawCircle(
+                        color = colors[i % colors.size].copy(alpha = 0.8f),
+                        radius = 4f * density,
+                        center = Offset(x, y)
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = "Success",
+                tint = SystemSuccess,
+                modifier = Modifier
+                    .size(80.dp)
+                    .graphicsLayer(scaleX = scale, scaleY = scale)
+            )
+        }
+
+        Text(
+            text = if (isJp) "トレーニング完了！" else "Workout Complete!",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Black,
+            fontStyle = FontStyle.Italic,
+            color = SystemSuccess,
+            textAlign = TextAlign.Center
+        )
+
+        Text(
+            text = if (isJp) 
+                "素晴らしい運動効率です。30分間のインターバル効果にしっかりと繋がっています！" 
+            else 
+                "Incredible effort! You completed your science-backed active intervals.",
+            fontSize = 13.sp,
+            color = TextMutedGrey,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Main modern report layout in a beautiful card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = if (isJp) "セッション統計" else "SESSION METRICS SUMMARY",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    letterSpacing = 1.sp
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), thickness = 1.dp)
+
+                // Grid layout with 4 metrics
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        CompletionMetricItem(
+                            icon = Icons.Default.DirectionsWalk,
+                            label = if (isJp) "総歩数" else "STEPS COUNT",
+                            value = "${data.steps}",
+                            unit = if (isJp) " 歩" else " steps",
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        CompletionMetricItem(
+                            icon = Icons.Default.Whatshot,
+                            label = if (isJp) "消費カロリー" else "CALORIES BURNED",
+                            value = String.format(Locale.getDefault(), "%.1f", data.calories),
+                            unit = " kcal",
+                            color = LaserCrimson
+                        )
+                    }
+                }
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        val min = data.durationSeconds / 60
+                        val sec = data.durationSeconds % 60
+                        CompletionMetricItem(
+                            icon = Icons.Default.Timer,
+                            label = if (isJp) "運動時間" else "TOTAL ACTIVE DURATION",
+                            value = String.format(Locale.getDefault(), "%d:%02d", min, sec),
+                            unit = "",
+                            color = TextOnObsidian
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        CompletionMetricItem(
+                            icon = Icons.Default.Speed,
+                            label = if (isJp) "推定ペース" else "ESTIMATED PACE",
+                            value = String.format(Locale.getDefault(), "%.1f", data.avgPace),
+                            unit = " m/km",
+                            color = RecoveryTeal
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), thickness = 1.dp)
+
+                // Extra details
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Loop,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isJp) "完了サイクル" else "Cycles Saved",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextMutedGrey
+                        )
+                    }
+                    Text(
+                        text = "Cycle ${data.totalCycles}",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.TrendingUp,
+                            contentDescription = null,
+                            tint = TextOnObsidian,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isJp) "平均ケイデンス" else "Avg Cadence",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextMutedGrey
+                        )
+                    }
+                    Text(
+                        text = String.format(Locale.getDefault(), "%.1f SPM", data.avgCadence),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        color = TextOnObsidian
+                    )
+                }
+
+                val formattedTime = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date(data.dateMillis))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = null,
+                            tint = TextMutedGrey,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isJp) "記録日時" else "Completed At",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextMutedGrey
+                        )
+                    }
+                    Text(
+                        text = formattedTime,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextMutedGrey
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Go to dashboard CTA Button
+        Button(
+            onClick = onGoToDashboard,
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Dashboard,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (isJp) "ダッシュボードに戻る" else "Go to Dashboard",
+                    fontWeight = FontWeight.Black,
+                    color = Color.Black,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CompletionMetricItem(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    unit: String,
+    color: Color
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = label,
+                fontSize = 10.sp,
+                color = TextMutedGrey,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = value,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Black,
+                fontStyle = FontStyle.Italic,
+                color = color,
+                lineHeight = 28.sp
+            )
+            if (unit.isNotEmpty()) {
+                Text(
+                    text = unit,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMutedGrey,
+                    modifier = Modifier.padding(bottom = 2.dp, start = 2.dp)
+                )
+            }
+        }
     }
 }

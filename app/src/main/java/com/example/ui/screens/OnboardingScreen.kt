@@ -14,6 +14,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -197,7 +200,8 @@ fun OnboardingScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
+                        .padding(24.dp)
+                        .verticalScroll(rememberScrollState()),
                     contentAlignment = Alignment.Center
                 ) {
                     when (step) {
@@ -442,9 +446,9 @@ fun WelcomeSlide(isJp: Boolean) {
         // Grid-based beautifully spaced list of hero features
         Text(
             text = if (isJp) {
-                "世界的な研究成果に基づく「インターバル速歩」を科学的に実践するためのアプリです。運動効果を大きく高め、確実なフィットネス成果を引き出します。"
+                "ジムに行く時間がない？ 毎日1万歩も歩けない？ JIW（インターバル速歩）なら、毎日たったの30分歩くだけで最高に健康的で引き締まった身体を実感できます。ゆっくりと早歩きを繰り返すだけのお手軽設計です！"
             } else {
-                "Scientific interval training engineered around Dr. Hiroshi Nose's medical proofs. Alternate slow walks and fast strolls to amplify aerobic capacity."
+                "No gym? No time for 10,000 steps a day? JIW matches your busy life by giving you all the benefits in just 30 minutes a day. Simply alternate between relaxed and brisk walking!"
             },
             fontSize = 13.sp,
             color = TextMutedGrey,
@@ -460,18 +464,18 @@ fun WelcomeSlide(isJp: Boolean) {
             modifier = Modifier.fillMaxWidth()
         ) {
             val features = if (isJp) listOf(
-                "⚡ スマート自動歩行トラッカー" to "歩行を検知して強弱周期をアシストします",
-                "⏱️ ピッチ・ケイデンス解析" to "分あたりの歩数をリアルタイム測定",
-                "🔥 正確なサイエンス消費カロリー" to "体重係数を用いたMETs公式エスティメイト",
-                "🧬 ヘルスコネクト自動連携" to "Google Fitほか健診アプリに歩数を双方向同期"
+                Triple(Icons.Default.Speed, "かんたん歩数アシスト", "早歩きとゆっくり歩きのタイミングをアプリがやさしく教えます"),
+                Triple(Icons.Default.DirectionsWalk, "らくらく自動計測", "スマートフォンを入れたままで、あなたの歩む速さを自動計測"),
+                Triple(Icons.Default.Whatshot, "納得の消費カロリー", "家事や通勤などの日常的なお散歩のエネルギー燃焼を表示"),
+                Triple(Icons.Default.Sync, "健康アプリと自動連携", "Google Fitやスマホ内臓の健康管理アプリと自動で同期できます")
             ) else listOf(
-                "⚡ Smart Step Tracking" to "Automatically segment walking routines with precision",
-                "⏱️ Cadence / Pace Tracking" to "Monitor stepped speeds and dynamic velocity intervals",
-                "🔥 Calorie Burn METs Engine" to "Dynamic energy calculations customized directly to your body mass",
-                "🧬 Health Connect Integration" to "Sync walked records instantly with persistent device databases"
+                Triple(Icons.Default.Speed, "Warm Interval Guides", "We gently guide you exactly when to speed up and slow down"),
+                Triple(Icons.Default.DirectionsWalk, "Effortless Step Tracker", "Tracks your daily walks automatically right from your pocket"),
+                Triple(Icons.Default.Whatshot, "Realistic Calorie Burn", "See how much fat you burn during everyday tasks and walks"),
+                Triple(Icons.Default.Sync, "Auto Sync", "Connects securely with Google Fit or Health Connect in one click")
             )
 
-            features.forEach { (title, desc) ->
+            features.forEach { (icon, title, desc) ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -481,10 +485,10 @@ fun WelcomeSlide(isJp: Boolean) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Verified,
+                        imageVector = icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
@@ -549,7 +553,7 @@ fun StepTrackingSlide(isJp: Boolean) {
         }
 
         Text(
-            text = if (isJp) "高精度ハードウェア計測" else "Dynamic Step Trackers",
+            text = if (isJp) "毎日たった30分でOK！" else "Anytime, Anywhere",
             fontSize = 20.sp,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center
@@ -559,9 +563,9 @@ fun StepTrackingSlide(isJp: Boolean) {
 
         Text(
             text = if (isJp) {
-                "Android内蔵の専用ハードウェア歩数カウンターを採用し、バッテリー消費を極限まで抑えます。"
+                "お買い物中、通勤中、あるいはお散歩。いつものちょっとした歩行がお手軽で効果的な有酸素トレーニングに早変わり。1日たった30分の習慣で十分です！"
             } else {
-                "Employs Android's low-power hardware step sensors to capture step counts, minimizing screen-off battery drainage."
+                "You don't need a gym membership or hours of free time. JIW is designed to turn your commute, errand runs, or casual strolls into premium exercise within just 30 minutes!"
             },
             fontSize = 13.sp,
             color = TextMutedGrey,
@@ -587,7 +591,7 @@ fun StepTrackingSlide(isJp: Boolean) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (isJp) "ファントムカウントを防止" else "Anti-Phantom Validations",
+                        text = if (isJp) "ポケットやバッグに入れたままで！" else "Pocket-Friendly Tracking",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -596,9 +600,9 @@ fun StepTrackingSlide(isJp: Boolean) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = if (isJp) {
-                        "腕振りや車の揺れなど、無効な動きや「偽の歩数」を高度な活動バリデーションでフィルタリング。本当に歩いている時の運動ログのみを厳密に計上します。"
+                        "スマホを身につけておくだけでOK。電車や車の揺れなどの無駄な動きを自動で除き、本当に歩いた歩数だけをスマートに、バッテリーをほとんど消費せずにカウントします。"
                     } else {
-                        "Filters out phantom steps caused by arm waving or vehicle vibrations. Dynamic walking validations guarantee logs consist purely of genuine physical locomotion."
+                        "The app works quietly in the background, tracking only your genuine walking. It automatically ignores train or car vibrations, saving your phone's battery completely."
                     },
                     fontSize = 11.sp,
                     color = TextMutedGrey,
@@ -634,7 +638,7 @@ fun WalkingInsightsSlide(isJp: Boolean) {
         }
 
         Text(
-            text = if (isJp) "歩行バイオメカニクス分析" else "Walking Insights",
+            text = if (isJp) "自分のペースで進むだけ" else "Keep It Simple & Fun",
             fontSize = 20.sp,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center
@@ -644,9 +648,9 @@ fun WalkingInsightsSlide(isJp: Boolean) {
 
         Text(
             text = if (isJp) {
-                "ただの歩数計算ではありません。あなたの歩行サイクルに含まれる速度成分を定量化します。"
+                "難しいルールや計算は一切ありません。いつもの歩きに「少しだけ早歩き」を交ぜるだけで、アプリが今日のウォーキング結果を分かりやすくまとめてくれます。"
             } else {
-                "Far beyond static integers. We dynamically decompose pacing attributes behind every stride to score walking health."
+                "You don't need to learn any complex rules. Just alternate easy walking with slightly faster steps. We automatically track how well you did!"
             },
             fontSize = 13.sp,
             color = TextMutedGrey,
@@ -664,18 +668,18 @@ fun WalkingInsightsSlide(isJp: Boolean) {
             val items = listOf(
                 Triple(
                     Icons.Default.Speed,
-                    if (isJp) "ケイデンス" else "Cadence",
-                    if (isJp) "歩行周期の周波数\n(SPM)" else "Frequency (Steps/Min)"
+                    if (isJp) "歩く早さ" else "Walking Pace",
+                    if (isJp) "どれくらい早く歩く\nことができたか" else "How fast you walk throughout the day"
                 ),
                 Triple(
                     Icons.Default.HourglassEmpty,
-                    if (isJp) "強弱切替" else "Intervals",
-                    if (isJp) "ゆっくりと早歩き\nの交互ピッチ" else "Fast vs Slow gait toggles"
+                    if (isJp) "メリハリ歩行" else "Walk Switch",
+                    if (isJp) "ゆっくりと早歩きの\n自動タイミング" else "Switching between slow and brisk steps"
                 ),
                 Triple(
                     Icons.Default.Map,
-                    if (isJp) "距離・ペース" else "Distance",
-                    if (isJp) "累積歩数から\n距離・速度を算出" else "Scientific strides metrics"
+                    if (isJp) "歩行の記録" else "Logs & Paths",
+                    if (isJp) "歩いた距離とお時間を\n優しく記録" else "Showing clean records of your walks"
                 )
             )
 
@@ -735,7 +739,7 @@ fun CaloriesSlide(isJp: Boolean) {
         }
 
         Text(
-            text = if (isJp) "科学的消費エネルギー" else "Caloric Expenditures",
+            text = if (isJp) "賢くカロリー消費！" else "Burn Calories Efficiently",
             fontSize = 20.sp,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center
@@ -745,9 +749,9 @@ fun CaloriesSlide(isJp: Boolean) {
 
         Text(
             text = if (isJp) {
-                "インターバル速歩中の運動負荷に基づき、消費カロリーを精密に計算します。"
+                "少し息がはずむ「早歩き」を普段の生活に取り入れるだけで、カロリー消費効率がアップ。あなたに合わせたエネルギー計算を自動で行います。"
             } else {
-                "Dynamically approximates energy burned during high key interval segments."
+                "Whenever you walk briskly during your day, your body burns extra calories. We make it easy to see how much energy you burn without any manual entry!"
             },
             fontSize = 13.sp,
             color = TextMutedGrey,
@@ -764,24 +768,44 @@ fun CaloriesSlide(isJp: Boolean) {
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                val bulletPoints = if (isJp) listOf(
-                    "⚖️ 体重がカロリーの精度に直結：体重入力によって、カロリー算出アルゴリズムが最適化されます。",
-                    "📐 科学的なMETs係数：ゆっくり歩行と強歩行それぞれの負荷を区別し、METsエネルギー公式を用いて合算。",
-                    "⚠️ あくまで目安として：表示される数値はフィットネス向上のための推定値であり、医療目的には使用できません。"
+                val bullets = if (isJp) listOf(
+                    Triple(Icons.Default.Scale, "あなた専用の計算", "現在の体重を入力することで、歩行パターンに合わせたより確かなカロリーを表示できます。"),
+                    Triple(Icons.Default.Speed, "二つの歩く速さ", "ゆっくり歩いている時と、早く歩いている時の違いをかしこく見分けて計算します。"),
+                    Triple(Icons.Default.Info, "楽しく続けるために", "表示される数値は、毎日の健康づくりとやる気を楽しく高めるための優しい目標目安です。")
                 ) else listOf(
-                    "⚖️ Weight calibration is central: Entering precise mass figures provides accurate biomechanical formulas.",
-                    "📐 Dynamic METs metrics: Alternates energy equations based on gait speed intervals and active cadences.",
-                    "⚠️ Estimated figures: Calories are strictly physiological estimates, built as fitness scoring guides rather than diagnostic models."
+                    Triple(Icons.Default.Scale, "Weight calibration", "Entering your weight helps customize your calorie burn measurements automatically."),
+                    Triple(Icons.Default.Speed, "Speed recognition", "We comfortably separate fast walking from easy strolls to measure your effort."),
+                    Triple(Icons.Default.Info, "Supportive guide", "Enjoy watching your counts grow as a friendly way to stay active and feel energetic!")
                 )
 
-                bulletPoints.forEach { point ->
-                    Text(
-                        text = point,
-                        fontSize = 11.sp,
-                        color = TextMutedGrey,
-                        lineHeight = 16.sp,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
+                bullets.forEach { (icon, title, desc) ->
+                    Row(
+                        modifier = Modifier.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(top = 2.dp, end = 8.dp)
+                                .size(14.dp)
+                        )
+                        Column {
+                            Text(
+                                text = title,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = desc,
+                                fontSize = 10.sp,
+                                color = TextMutedGrey,
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -844,7 +868,7 @@ fun WeightCollectionSlide(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = if (isJp) "プロフィール体重設定" else "Calibrate Body Weight",
+            text = if (isJp) "かんたん体重の設定" else "Let's Get Personalized",
             fontSize = 20.sp,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center
@@ -854,9 +878,9 @@ fun WeightCollectionSlide(
 
         Text(
             text = if (isJp) {
-                "METs（メッツ）を用いた高精度な消費カロリー計算のために、現在の体重を入力してください。数値は端末内に安全に暗号化保存されます。"
+                "あなたにぴったりの消費カロリーを計算するため、現在の体重を入力してください（いつでも後から変更できます）。この数値はスマホの中だけに安全に保存されます。"
             } else {
-                "Precision tracking equation (MET formula) requires physical mass coefficients. Weight is stored strictly locally."
+                "Please enter your weight below to help us estimate your calorie burns accurately during your 30-minute walks. Your weight is saved safely only on your phone."
             },
             fontSize = 12.sp,
             color = TextMutedGrey,
@@ -885,31 +909,49 @@ fun WeightCollectionSlide(
 
         if (isError) {
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = errorText,
-                color = LaserCrimson,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.align(Alignment.Start)
-            )
+            ) {
+                Icon(Icons.Default.Error, contentDescription = null, tint = LaserCrimson, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = errorText,
+                    color = LaserCrimson,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         } else if (weightInput.toFloatOrNull() != null) {
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = if (isJp) "✅ 適正な体重値が入力されました" else "✅ Valid weight parameters updated",
-                color = SystemSuccess,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.align(Alignment.Start)
-            )
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SystemSuccess, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isJp) "入力されました！ありがとうございます" else "Weight saved successfully",
+                    color = SystemSuccess,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         } else {
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = if (isJp) "⚠️ 先に進むには正しい体重を入力してください（20kg〜300kg）" else "⚠️ Valid bodyweight required to unlock step tracking (20kg-300kg)",
-                color = SystemWarning,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.align(Alignment.Start)
-            )
+            ) {
+                Icon(Icons.Default.Info, contentDescription = null, tint = SystemWarning, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isJp) "先に進むには、正しい体重を入力してください（20kg〜300kg）" else "Please enter a valid weight to continue (20kg to 300kg)",
+                    color = SystemWarning,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }
@@ -945,7 +987,7 @@ fun PermissionsSlide(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = if (isJp) "トラッキング権限の管理" else "Grant Health Permissions",
+            text = if (isJp) "かんたんアプリの準備" else "Let's Get Set Up!",
             fontSize = 20.sp,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center
@@ -955,9 +997,9 @@ fun PermissionsSlide(
 
         Text(
             text = if (isJp) {
-                "バックグラウンドでの歩幅歩数カウント、インターバル切り替え検知を正常におこなうため、いくつかの基本権限が必要です。"
+                "スマートフォンをポケットに入れたままでも、歩数を正しくカウントして「早歩き・ゆっくり」の切り替え指示をお伝えするために、2つの許可をオンにしてください。"
             } else {
-                "Requires crucial system privileges to record passive cadences and guide transitions background."
+                "To let JIW automatically count your steps in your pocket and point out exactly when to walk fast or slow, we just need a few quick settings."
             },
             fontSize = 12.sp,
             color = TextMutedGrey,
@@ -974,24 +1016,27 @@ fun PermissionsSlide(
         ) {
             // Permission 1: ACTIVITY_RECOGNITION
             PermissionStatusRow(
-                title = if (isJp) "💡 身体活動の認知検出 (必須)" else "💡 Physical Activity (Required)",
-                desc = if (isJp) "スマホ内蔵のハードウェア歩数カウンターの数値を検知するのに必要です。" else "Used solely to retrieve real-time hardware footstep counters.",
-                granted = hasActivity
+                title = if (isJp) "歩数の計測 (必須)" else "Count My Steps (Required)",
+                desc = if (isJp) "歩いている時に、スマホのセンサーから歩数を自動で優しくカウントするために必要です。" else "Used to measure your steps automatically right when you start walking.",
+                granted = hasActivity,
+                imageVector = Icons.Default.DirectionsWalk
             )
 
             // Permission 2: POST_NOTIFICATIONS
             PermissionStatusRow(
-                title = if (isJp) "🔔 通知の許可 (推奨)" else "🔔 Post Notifications (Recommended)",
-                desc = if (isJp) "ウォーク中の早歩き・ゆっくり交代の指示や、日々のリマインドを表示します。" else "Used to guide interval transition steps and active alarms.",
-                granted = hasNotify
+                title = if (isJp) "切り替えの合図 (推奨)" else "Healthy Guide Notes (Recommended)",
+                desc = if (isJp) "ゆっくり歩きから早歩きに変わる時の心地よいベル音や振動、大切なリマインドに使います。" else "We drop a quick nudge when it's time to speed up or take a slow recovery breath.",
+                granted = hasNotify,
+                imageVector = Icons.Default.NotificationsActive
             )
 
             // Permission 3: HEALTH CONNECT (Optional Integration)
             if (isHcAvailable) {
                 PermissionStatusRow(
-                    title = if (isJp) "🧬 ヘルスコネクト (任意連携)" else "🧬 Health Connect Integration (Optional)",
-                    desc = if (isJp) "Google Fitほか各種健康管理アプリと本アプリの歩行ログ・カロリーを双方向同期します。" else "Directly sync stepped sessions background with personal Fit accounts.",
+                    title = if (isJp) "他の健康アプリとつなぐ (任意)" else "Share with Health Apps (Optional)",
+                    desc = if (isJp) "Google Fitやスマホ内蔵の健康管理アプリと、歩数データなどを自動でかんたんに共有します。" else "Import and export burned calories and walking logs between JIW and other fitness tools.",
                     granted = hasHc,
+                    imageVector = Icons.Default.Sync,
                     showConnectButton = true,
                     onConnectClick = onConnectHc
                 )
@@ -1008,26 +1053,43 @@ fun PermissionsSlide(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = if (isJp) "システム認証をリクエスト" else "AUTHORIZE DETECTIONS",
+                    text = if (isJp) "設定画面で許可する" else "GRANT PERMISSION",
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 12.sp
                 )
             }
         } else {
-            Box(
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SystemSuccess.copy(alpha = 0.12f)),
+                border = BorderStroke(1.dp, SystemSuccess.copy(alpha = 0.25f)),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f))
-                    .padding(10.dp),
-                contentAlignment = Alignment.Center
+                    .padding(vertical = 4.dp)
             ) {
-                Text(
-                    text = if (isJp) "✅ トラッキングに必要な基本権限は承認されています" else "✅ Permissions granted",
-                    color = SystemSuccess,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = SystemSuccess,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isJp) "基本的な歩行計測の準備ができています" else "Ready to track your daily walks!",
+                        color = SystemSuccess,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
@@ -1038,6 +1100,7 @@ fun PermissionStatusRow(
     title: String,
     desc: String,
     granted: Boolean,
+    imageVector: ImageVector,
     showConnectButton: Boolean = false,
     onConnectClick: () -> Unit = {}
 ) {
@@ -1053,6 +1116,13 @@ fun PermissionStatusRow(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Icon(
+                imageVector = imageVector,
+                contentDescription = null,
+                tint = if (granted) SystemSuccess else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = title, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(2.dp))
@@ -1064,7 +1134,7 @@ fun PermissionStatusRow(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = "Granted token tick",
                     tint = SystemSuccess,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(22.dp)
                 )
             } else {
                 if (showConnectButton) {
@@ -1134,7 +1204,7 @@ fun CompletionReadySlide(
         }
 
         Text(
-            text = if (isJp) "歩こう、準備はできた！" else "You're Ready to Walk",
+            text = if (isJp) "さあ、始めましょう！" else "You're Ready!",
             fontSize = 24.sp,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center,
@@ -1145,9 +1215,9 @@ fun CompletionReadySlide(
 
         Text(
             text = if (isJp) {
-                "オンボーディングツアーと初期セッティングは無事に完了しました！サイエンスインターバル歩行で最高の結果を獲得しましょう。"
+                "準備はすべて完了しました！ジムに通う時間がなくても、1日たった30分の「メリハリ歩き」が毎日の体調をベストに整えます。さっそく今日から心地よい第一歩を踏み出してみましょう！"
             } else {
-                "Initial profile settings compiled and localized securely. You are set to optimize your calorie burns."
+                "You're all set! No need for the gym or hours of free time. Just 30 minutes of natural, smart walking during your day is all it takes to keep you healthy and energized. Let's take that first step together!"
             },
             fontSize = 13.sp,
             color = TextMutedGrey,
@@ -1169,7 +1239,7 @@ fun CompletionReadySlide(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = if (isJp) "【初期状態サマリー】" else "STATUS SETUP LOGS",
+                    text = if (isJp) "【現在の設定まとめ】" else "YOUR SETUP SUMMARY",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.primary
@@ -1180,7 +1250,7 @@ fun CompletionReadySlide(
                     Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.Green, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = if (isJp) "体重登録完了: ${savedWeight ?: 70f} kg" else "Athlete weight calibrated: ${savedWeight ?: 70f} kg",
+                        text = if (isJp) "体重の登録完了: ${savedWeight ?: 70f} kg" else "Weight saved: ${savedWeight ?: 70f} kg",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1197,9 +1267,9 @@ fun CompletionReadySlide(
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (hasActivity) {
-                            if (isJp) "高精度ハードウェア歩数トラッキング完了" else "Hardware footstep tracking: Active"
+                            if (isJp) "お散歩・ウォーキング自動計測: 準備完了" else "Auto step counting: Ready"
                         } else {
-                            if (isJp) "歩数トラッキング権限: 未承認 (制限あり)" else "Hardware step permissions: Missing"
+                            if (isJp) "お散歩計測: 未許可 (制限あり)" else "Auto step counting: Tap to grant"
                         },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
@@ -1217,9 +1287,9 @@ fun CompletionReadySlide(
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = if (hasHc) {
-                            if (isJp) "ヘルスコネクト: 連携中 (自動同期)" else "Health Connect: Connected"
+                            if (isJp) "他の健康アプリとの連携: 接続中 (自動保存)" else "Other health apps: Connected"
                         } else {
-                            if (isJp) "ヘルスコネクト: 未連携 (後で設定可)" else "Health Connect: Skipped for now"
+                            if (isJp) "他の健康アプリとの連携: 未接続 (後で追加できます)" else "Other health apps: Skip for now"
                         },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold

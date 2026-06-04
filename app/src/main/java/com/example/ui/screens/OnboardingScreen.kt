@@ -107,6 +107,17 @@ fun OnboardingScreen(
         )
     }
 
+    // Stably declared Health Connect launcher at top-level
+    val hcPermissionLauncher = rememberLauncherForActivityResult(
+        contract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        android.util.Log.d("HealthConnect", "Onboarding Health Connect permissions request finished: granted: $granted")
+        viewModel.checkHealthConnectPermissions()
+        viewModel.logOnboardingEvent(
+            if (granted.isNotEmpty()) "health_connect_connected" else "permission_denied"
+        )
+    }
+
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
@@ -148,8 +159,9 @@ fun OnboardingScreen(
                             radius = 1200f
                         )
                     } else {
-                        Brush.verticalGradient(
-                            colors = listOf(MinimalLightBg, Color(0xFFF0F7EC))
+                        Brush.radialGradient(
+                            colors = listOf(Color(0xFFE5F5DD), MinimalLightBg),
+                            radius = 1200f
                         )
                     }
                 )
@@ -218,6 +230,10 @@ fun OnboardingScreen(
                                 if (list.isNotEmpty()) {
                                     permissionLauncher.launch(list.toTypedArray())
                                 }
+                            },
+                            onConnectHc = {
+                                android.util.Log.d("HealthConnect", "Onboarding permissions slide Connect button clicked")
+                                viewModel.healthConnectPermissionManager.launchPermissionRequestSafely(hcPermissionLauncher)
                             }
                         )
                         6 -> CompletionReadySlide(isJp, savedWeight, hasActivityPermission, hasHcPermission)
@@ -618,7 +634,7 @@ fun WalkingInsightsSlide(isJp: Boolean) {
         }
 
         Text(
-            text = if (isJp) "歩行バイオメカニクス分析" else "Locomotion Insights",
+            text = if (isJp) "歩行バイオメカニクス分析" else "Walking Insights",
             fontSize = 20.sp,
             fontWeight = FontWeight.Black,
             textAlign = TextAlign.Center
@@ -880,7 +896,7 @@ fun WeightCollectionSlide(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = if (isJp) "✅ 適正な体重値が入力されました" else "✅ Valid weight parameters updated",
-                color = Color.Green,
+                color = SystemSuccess,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.Start)
@@ -889,7 +905,7 @@ fun WeightCollectionSlide(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = if (isJp) "⚠️ 先に進むには正しい体重を入力してください（20kg〜300kg）" else "⚠️ Valid bodyweight required to unlock step tracking (20kg-300kg)",
-                color = Color(0xFFFFB74D),
+                color = SystemWarning,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier.align(Alignment.Start)
@@ -908,19 +924,11 @@ fun PermissionsSlide(
     hasActivity: Boolean,
     hasNotify: Boolean,
     hasHc: Boolean,
-    onRequest: () -> Unit
+    onRequest: () -> Unit,
+    onConnectHc: () -> Unit
 ) {
     val sdkStatus = remember { viewModel.healthConnectManager.getSdkStatus() }
     val isHcAvailable = sdkStatus == androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE
-
-    val requestPermissionsLauncher = rememberLauncherForActivityResult(
-        contract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
-    ) { granted ->
-        viewModel.checkHealthConnectPermissions()
-        viewModel.logOnboardingEvent(
-            if (granted.isNotEmpty()) "health_connect_connected" else "permission_denied"
-        )
-    }
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -985,9 +993,7 @@ fun PermissionsSlide(
                     desc = if (isJp) "Google Fitほか各種健康管理アプリと本アプリの歩行ログ・カロリーを双方向同期します。" else "Directly sync stepped sessions background with personal Fit accounts.",
                     granted = hasHc,
                     showConnectButton = true,
-                    onConnectClick = {
-                        requestPermissionsLauncher.launch(viewModel.healthConnectManager.requiredPermissions)
-                    }
+                    onConnectClick = onConnectHc
                 )
             }
         }
@@ -1004,7 +1010,7 @@ fun PermissionsSlide(
                 Text(
                     text = if (isJp) "システム認証をリクエスト" else "AUTHORIZE DETECTIONS",
                     fontWeight = FontWeight.Black,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     fontSize = 12.sp
                 )
             }
@@ -1012,13 +1018,13 @@ fun PermissionsSlide(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF0F1B12))
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f))
                     .padding(10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (isJp) "✅ トラッキングに必要な基本権限は承認されています" else "✅ Locomotion permissions authorized",
-                    color = Color.Green,
+                    text = if (isJp) "✅ トラッキングに必要な基本権限は承認されています" else "✅ Permissions granted",
+                    color = SystemSuccess,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -1037,7 +1043,7 @@ fun PermissionStatusRow(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        border = BorderStroke(1.dp, if (granted) Color.Green.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline),
+        border = BorderStroke(1.dp, if (granted) SystemSuccess.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline),
         shape = RoundedCornerShape(10.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1057,7 +1063,7 @@ fun PermissionStatusRow(
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = "Granted token tick",
-                    tint = Color.Green,
+                    tint = SystemSuccess,
                     modifier = Modifier.size(24.dp)
                 )
             } else {
@@ -1066,7 +1072,10 @@ fun PermissionStatusRow(
                         onClick = onConnectClick,
                         shape = RoundedCornerShape(6.dp),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = Color.Black),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary
+                        ),
                         modifier = Modifier.height(30.dp)
                     ) {
                         Text(text = "Connect", fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -1075,7 +1084,7 @@ fun PermissionStatusRow(
                     Icon(
                         imageVector = Icons.Default.Warning,
                         contentDescription = "Not granted caution sign",
-                        tint = Color(0xFFFFB74D),
+                        tint = SystemWarning,
                         modifier = Modifier.size(20.dp)
                     )
                 }

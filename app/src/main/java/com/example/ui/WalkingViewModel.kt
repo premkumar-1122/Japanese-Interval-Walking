@@ -155,6 +155,7 @@ class WalkingViewModel(
     }
 
     val healthConnectManager = com.example.data.HealthConnectManager(application)
+    val healthConnectPermissionManager = com.example.data.HealthConnectPermissionManager(application)
 
     private val _hasHealthConnectPermissions = MutableStateFlow(false)
     val hasHealthConnectPermissions: StateFlow<Boolean> = _hasHealthConnectPermissions.asStateFlow()
@@ -163,8 +164,9 @@ class WalkingViewModel(
     val lastSyncMetadata: StateFlow<com.example.data.SyncMetadata> = _lastSyncMetadata.asStateFlow()
 
     fun checkHealthConnectPermissions() {
+        healthConnectManager.invalidateCachedStatus()
         viewModelScope.launch {
-            _hasHealthConnectPermissions.value = healthConnectManager.hasAllPermissions()
+            _hasHealthConnectPermissions.value = healthConnectPermissionManager.hasAllPermissions()
         }
     }
 

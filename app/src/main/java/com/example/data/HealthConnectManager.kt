@@ -45,12 +45,73 @@ class HealthConnectManager(private val context: Context) {
         HealthPermission.getWritePermission(ExerciseSessionRecord::class)
     )
 
+    private var cachedStatus: Int? = null
+
+    fun invalidateCachedStatus() {
+        cachedStatus = null
+    }
+
+    private fun isProviderPackageInstalled(context: Context): Boolean {
+        val providerPackageName = "com.google.android.apps.healthdata"
+        return try {
+            val pm = context.packageManager
+            val info = pm.getPackageInfo(providerPackageName, 0)
+            val isEnabled = info.applicationInfo?.enabled == true
+            Log.d("HealthConnect", "Provider package info retrieved: ${info.packageName}, enabled: $isEnabled")
+            isEnabled
+        } catch (e: Exception) {
+            Log.d("HealthConnect", "Provider package check failed: ${e.message}")
+            false
+        }
+    }
+
+    private fun getProviderVersion(context: Context): Long {
+        val providerPackageName = "com.google.android.apps.healthdata"
+        return try {
+            val pm = context.packageManager
+            val info = pm.getPackageInfo(providerPackageName, 0)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                info.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                info.versionCode.toLong()
+            }
+        } catch (e: Exception) {
+            -1L
+        }
+    }
+
     fun isSdkAvailable(): Boolean {
-        return HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
+        return getSdkStatus() == HealthConnectClient.SDK_AVAILABLE
     }
 
     fun getSdkStatus(): Int {
-        return HealthConnectClient.getSdkStatus(context)
+        val cached = cachedStatus
+        if (cached != null) return cached
+
+        val status = HealthConnectClient.getSdkStatus(context)
+        val installed = isProviderPackageInstalled(context)
+        val version = getProviderVersion(context)
+        Log.d("HealthConnect", "SDK Status: $status")
+        Log.d("HealthConnect", "Android Version: ${android.os.Build.VERSION.SDK_INT}")
+        Log.d("HealthConnect", "Provider Installed: $installed")
+        Log.d("HealthConnect", "Provider Version: $version")
+
+        var finalStatus = status
+
+        if (status != HealthConnectClient.SDK_AVAILABLE && installed) {
+            try {
+                // Test client initialization directly to see if standalone provider works fine
+                val testClient = HealthConnectClient.getOrCreate(context)
+                Log.d("HealthConnect", "Fallback check success: client initialized successfully! Setting status to SDK_AVAILABLE")
+                finalStatus = HealthConnectClient.SDK_AVAILABLE
+            } catch (e: Exception) {
+                Log.e("HealthConnect", "Fallback client initialization failed for status $status", e)
+            }
+        }
+
+        cachedStatus = finalStatus
+        return finalStatus
     }
 
     fun getPlayStoreIntent(): Intent {

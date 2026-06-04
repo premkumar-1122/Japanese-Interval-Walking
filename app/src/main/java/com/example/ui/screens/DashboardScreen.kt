@@ -52,6 +52,22 @@ import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 
+private val TextMutedGrey: Color
+    @Composable
+    get() = if (MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)) {
+        Color(0xFF5F6368)
+    } else {
+        Color(0xFFA3A3A3)
+    }
+
+private val TextOnObsidian: Color
+    @Composable
+    get() = if (MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)) {
+        Color(0xFF111111)
+    } else {
+        Color(0xFFFFFFFF)
+    }
+
 private fun hasRequiredPermissions(context: Context): Boolean {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         val permission = "android.permission.ACTIVITY_RECOGNITION"
@@ -76,6 +92,21 @@ fun DashboardScreen(
 ) {
     val context = LocalContext.current
     val isJp by viewModel.isJpLanguage.collectAsStateWithLifecycle()
+
+    // Observe lifecycle ON_RESUME to dynamically recheck Health Connect status/permissions
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.checkHealthConnectPermissions()
+                viewModel.refreshSyncMetadata()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     
     // UI tabs state
     var selectedTab by remember { mutableStateOf(0) }
@@ -96,6 +127,15 @@ fun DashboardScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { _ -> }
+
+    // Stably declared top-level Health Connect request launcher
+    val hcPermissionLauncher = rememberLauncherForActivityResult(
+        contract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
+    ) { granted ->
+        android.util.Log.d("HealthConnect", "Dashboard Health Connect permissions request finished: granted: $granted")
+        viewModel.checkHealthConnectPermissions()
+        viewModel.refreshSyncMetadata()
+    }
 
     val permissionsToRequest = remember {
         val list = mutableListOf<String>()
@@ -122,9 +162,12 @@ fun DashboardScreen(
                                 letterSpacing = 2.sp,
                                 modifier = Modifier.padding(bottom = 2.dp)
                             )
+                            val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
                             Text(
                                 text = if (isJp) "JIWトラッカー" else "JIW Tracker",
                                 fontWeight = FontWeight.Black,
+                                fontStyle = if (isLightMode) FontStyle.Italic else FontStyle.Normal,
+                                color = if (isLightMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground,
                                 fontSize = 21.sp,
                                 letterSpacing = (-0.5).sp
                             )
@@ -173,9 +216,15 @@ fun DashboardScreen(
         },
         bottomBar = {
             if (!isTrackingActive) {
+                val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
+                val navBgColor = if (isLightMode) Color(0xFFEDF3E7) else MaterialTheme.colorScheme.surface
+                val activePillColor = if (isLightMode) Color(0xFF5FAF35) else MaterialTheme.colorScheme.primary
+                val activeContentColor = if (isLightMode) Color(0xFF111111) else Color.Black
+                val inactiveColor = if (isLightMode) Color(0xFF7A7A7A) else Color(0xFFA3A3A3)
+
                 NavigationBar(
-                    containerColor = NavigationBarColor,
-                    tonalElevation = 8.dp,
+                    containerColor = navBgColor,
+                    tonalElevation = 12.dp,
                     windowInsets = WindowInsets.navigationBars
                 ) {
                     val items = listOf(
@@ -216,11 +265,11 @@ fun DashboardScreen(
                                 ) 
                             },
                             colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.Black,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primary,
-                                unselectedIconColor = TextMutedGrey,
-                                unselectedTextColor = TextMutedGrey
+                                selectedIconColor = activeContentColor,
+                                selectedTextColor = activeContentColor,
+                                indicatorColor = activePillColor,
+                                unselectedIconColor = inactiveColor,
+                                unselectedTextColor = inactiveColor
                             )
                         )
                     }
@@ -244,11 +293,15 @@ fun DashboardScreen(
                     isJp = isJp
                 )
             } else {
+                val onConnectHealthConnect = {
+                    android.util.Log.d("HealthConnect", "Launcher requested from inner screen tab")
+                    viewModel.healthConnectPermissionManager.launchPermissionRequestSafely(hcPermissionLauncher)
+                }
                 when (selectedTab) {
                     0 -> TrainTabScreen(viewModel, isJp, onPermissionRequest = { permissionsGrantedAlert = true })
-                    1 -> DashboardStatsTabScreen(viewModel, isJp, historyLog, isInternetOnline, onInternetToggle = { isInternetOnline = !isInternetOnline })
+                    1 -> DashboardStatsTabScreen(viewModel, isJp, historyLog, isInternetOnline, onInternetToggle = { isInternetOnline = !isInternetOnline }, onConnectHc = onConnectHealthConnect)
                     2 -> TechniqueTabScreen(isJp)
-                    3 -> SettingsTabScreen(viewModel, isJp)
+                    3 -> SettingsTabScreen(viewModel, isJp, onConnectHc = onConnectHealthConnect)
                 }
             }
 
@@ -517,13 +570,16 @@ fun DashboardStatsTabScreen(
     isJp: Boolean,
     history: List<WalkingSession>,
     isInternetOnline: Boolean,
-    onInternetToggle: () -> Unit
+    onInternetToggle: () -> Unit,
+    onConnectHc: () -> Unit
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val syncStatus by viewModel.syncingProgress.collectAsStateWithLifecycle()
     val isGfConnected by viewModel.isGoogleFitConnected.collectAsStateWithLifecycle()
     val isHcConnected by viewModel.isHealthConnectConnected.collectAsStateWithLifecycle()
+    val hasHCPermissions by viewModel.hasHealthConnectPermissions.collectAsStateWithLifecycle()
+    val lastSyncMetadata by viewModel.lastSyncMetadata.collectAsStateWithLifecycle()
 
     // Share dialog record holder
     var activeShareSession by remember { mutableStateOf<WalkingSession?>(null) }
@@ -602,24 +658,23 @@ fun DashboardStatsTabScreen(
 
         // Interactive health integration card (Redesigned exclusively for Health Connect)
         item {
-            val hasHCPermissions by viewModel.hasHealthConnectPermissions.collectAsStateWithLifecycle()
-            val lastSyncMetadata by viewModel.lastSyncMetadata.collectAsStateWithLifecycle()
             val sdkStatus = remember { viewModel.healthConnectManager.getSdkStatus() }
-            val isAvailable = sdkStatus == androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE
+
+            val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
 
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(24.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(24.dp)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             Icon(
                                 imageVector = Icons.Default.CloudSync, 
                                 contentDescription = "Sync status", 
@@ -629,24 +684,50 @@ fun DashboardStatsTabScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = if (isJp) "Android ヘルスコネクト連携" else "Android Health Connect Sync",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
+                                fontWeight = FontWeight.Black,
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         
-                        // Permission Status indicator badge
-                        val statusText = if (isAvailable) {
-                            if (hasHCPermissions) (if (isJp) "同期可能" else "CONNECTED") else (if (isJp) "権限未設定" else "SETUP REQD")
-                        } else {
-                            if (isJp) "初期化エラー" else "UNAVAILABLE"
+                        // Redesigned compact status chip using theme variables and soft containers
+                        val (statusText, statusBg, statusColor) = when (sdkStatus) {
+                            androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE -> {
+                                if (hasHCPermissions) {
+                                    Triple(
+                                        if (isJp) "接続中" else "Connected",
+                                        SystemSuccess.copy(alpha = 0.15f),
+                                        SystemSuccess
+                                    )
+                                } else {
+                                    Triple(
+                                        if (isJp) "アクセス許可が必要" else "Permissions Required",
+                                        SystemWarning.copy(alpha = 0.15f),
+                                        SystemWarning
+                                    )
+                                }
+                            }
+                            androidx.health.connect.client.HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
+                                Triple(
+                                    if (isJp) "更新が必要" else "Update Required",
+                                    SystemWarning.copy(alpha = 0.15f),
+                                    SystemWarning
+                                )
+                            }
+                            else -> {
+                                Triple(
+                                    if (isJp) "非対応" else "Not Supported",
+                                    SystemError.copy(alpha = 0.15f),
+                                    SystemError
+                                )
+                            }
                         }
-                        val statusBg = if (isAvailable && hasHCPermissions) Color(0xFF1E3A1E) else Color(0xFF3A2D1E)
-                        val statusColor = if (isAvailable && hasHCPermissions) Color.Green else Color(0xFFFFB74D)
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(statusBg)
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
@@ -666,7 +747,7 @@ fun DashboardStatsTabScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = if (isJp) 
                             "毎日の運動で消費したカロリー、歩数、距離、およびインターバル速歩（ゆっくり・早歩き）履歴をAndroid標準ヘルスコネクトに直接同期し、Google Fitなどの他健康管理アプリと自動連携します。"
@@ -679,20 +760,25 @@ fun DashboardStatsTabScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    val isAvailable = sdkStatus == androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE
+
                     if (isAvailable) {
                         // Display Sync Statistics if connected
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = if (isJp) "【最終同期実績】" else "LAST SYNCDATA STATUS",
+                                    text = if (isJp) "最終同期実績" else "LAST SYNCDATA STATUS",
                                     fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 0.5.sp
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
                                 
                                 val formattedSyncTime = remember(lastSyncMetadata) {
                                     if (lastSyncMetadata.lastSyncTimestamp > 0L) {
@@ -708,58 +794,91 @@ fun DashboardStatsTabScreen(
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text(text = if (isJp) "最終同期日時:" else "Sync Time:", fontSize = 11.sp, color = TextMutedGrey)
-                                    Text(text = formattedSyncTime, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = formattedSyncTime, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 }
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Row(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text(text = if (isJp) "同期歩数:" else "Synced Steps:", fontSize = 11.sp, color = TextMutedGrey)
-                                    Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) "${lastSyncMetadata.lastSyncedStepCount} steps" else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) "${lastSyncMetadata.lastSyncedStepCount} steps" else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 }
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Row(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Text(text = if (isJp) "同期カロリー:" else "Synced Calories:", fontSize = 11.sp, color = TextMutedGrey)
-                                    Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) String.format(java.util.Locale.getDefault(), "%.1f kcal", lastSyncMetadata.lastSyncedCalories) else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) String.format(java.util.Locale.getDefault(), "%.1f kcal", lastSyncMetadata.lastSyncedCalories) else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        // Sync triggers action button
-                        Button(
-                            onClick = { viewModel.syncUnsyncedSessions() },
-                            enabled = syncStatus !is WalkingViewModel.SyncStatus.Syncing && hasHCPermissions,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.secondary,
-                                contentColor = Color.Black
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
+                        if (hasHCPermissions) {
+                            Button(
+                                onClick = { viewModel.syncUnsyncedSessions() },
+                                enabled = syncStatus !is WalkingViewModel.SyncStatus.Syncing,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary,
+                                    contentColor = MaterialTheme.colorScheme.onSecondary
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Sync, 
-                                    contentDescription = "Sync now action",
-                                    tint = Color.Black,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    if (isJp) "ヘルスコネクトへ即時同期する" else "TRIGGER HEALTH SYNC NOW",
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 12.sp,
-                                    letterSpacing = 0.5.sp
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sync, 
+                                        contentDescription = "Sync now action",
+                                        tint = MaterialTheme.colorScheme.onSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        if (isJp) "ヘルスコネクトへ即時同期する" else "TRIGGER HEALTH SYNC NOW",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 12.sp,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    android.util.Log.d("HealthConnect", "Dashboard card MANAGE PERMISSIONS button clicked")
+                                    onConnectHc()
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary,
+                                    contentColor = MaterialTheme.colorScheme.onSecondary
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings, 
+                                        contentDescription = "Request setup permissions",
+                                        tint = MaterialTheme.colorScheme.onSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        if (isJp) "アクセス権限を許可する" else "MANAGE PERMISSIONS",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 12.sp,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
                             }
                         }
-                    } else {
-                        // Play store installation flow direct triggers
+                    } else if (sdkStatus == androidx.health.connect.client.HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED) {
                         Button(
                             onClick = {
                                 try {
@@ -770,28 +889,37 @@ fun DashboardStatsTabScreen(
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = Color.Black
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.DownloadForOffline, 
-                                    contentDescription = "Install now action",
-                                    tint = Color.Black,
+                                    contentDescription = "Install or update action",
+                                    tint = MaterialTheme.colorScheme.onPrimary,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    if (isJp) "ヘルスコネクトをプレイストアから入手" else "INSTALL HEALTH CONNECT SDK",
+                                    if (isJp) "ヘルスコネクトを更新する" else "UPDATE HEALTH CONNECT",
                                     fontWeight = FontWeight.Black,
                                     fontSize = 12.sp
                                 )
                             }
                         }
+                    } else {
+                        // Not supported on device, warning message only
+                        Text(
+                            text = if (isJp) "お使いのシステムはヘルスコネクトに対応していません。" else "Health Connect is not supported on this legacy device layout.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.error,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
 
                     // Display sync progress state beautifully
@@ -818,16 +946,17 @@ fun DashboardStatsTabScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color(0xFF0D2411))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Success tick icon", tint = Color.Green, modifier = Modifier.size(16.dp))
+                                Icon(imageVector = Icons.Default.CheckCircle, contentDescription = "Success tick icon", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = if (isJp) "同期完了！新しい履歴を同期しました。" else "Sync completed! Offline interval logs written to Health Connect.",
                                     fontSize = 11.sp,
-                                    color = Color.Green,
+                                    color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -837,16 +966,17 @@ fun DashboardStatsTabScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color(0xFF2E1216))
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f))
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(imageVector = Icons.Default.Warning, contentDescription = "Failure warning icon", tint = LaserCrimson, modifier = Modifier.size(16.dp))
+                                Icon(imageVector = Icons.Default.Warning, contentDescription = "Failure warning icon", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = status.message,
                                     fontSize = 11.sp,
-                                    color = LaserCrimson,
+                                    color = MaterialTheme.colorScheme.error,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -1018,11 +1148,11 @@ fun HistoryRowCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1164,7 +1294,7 @@ fun TechniqueTabScreen(isJp: Boolean) {
             )
         ),
         GuideChapter(
-            titleEn = "Premium Arm Swing",
+            titleEn = "Arm Movement",
             titleJp = "効果的な腕の振り方",
             icon = Icons.Default.FitnessCenter,
             tipsEn = listOf(
@@ -1200,7 +1330,7 @@ fun TechniqueTabScreen(isJp: Boolean) {
             )
         ),
         GuideChapter(
-            titleEn = "Shinshu University Scientific Proofs",
+            titleEn = "Research & Benefits",
             titleJp = "運動生理学と信州大学の成果",
             icon = Icons.Default.Science,
             tipsEn = listOf(
@@ -1244,11 +1374,22 @@ fun TechniqueTabScreen(isJp: Boolean) {
             val ch = chapters[index]
             val isExpanded = expandedIndex == index
 
+            val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
+            val cardElevation = if (isExpanded) 10.dp else 4.dp
+            val borderColor = if (isExpanded) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                if (isLightMode) Color(0xFFDDE5D8) else MaterialTheme.colorScheme.outline
+            }
+
             Card(
                 onClick = { expandedIndex = if (isExpanded) -1 else index },
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isLightMode) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.surfaceVariant
+                ),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                border = BorderStroke(1.dp, borderColor),
+                elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -1275,7 +1416,7 @@ fun TechniqueTabScreen(isJp: Boolean) {
                         Icon(
                             imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                             contentDescription = "expand icon",
-                            tint = TextMutedGrey
+                            tint = if (isLightMode) Color(0xFF7A7A7A) else TextMutedGrey
                         )
                     }
 
@@ -1299,7 +1440,7 @@ fun TechniqueTabScreen(isJp: Boolean) {
                                 Text(
                                     text = tip,
                                     fontSize = 12.sp,
-                                    color = TextOnObsidian,
+                                    color = if (isLightMode) Color(0xFF111111) else TextOnObsidian,
                                     lineHeight = 17.sp,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -1324,7 +1465,7 @@ data class GuideChapter(
 // TAB 3: SYSTEM SETTINGS, DURATION PARAMETERS
 // ==========================================
 @Composable
-fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean) {
+fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: () -> Unit) {
     val context = LocalContext.current
     
     // Core parameters from preferences
@@ -1344,6 +1485,9 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean) {
     val remindOn by viewModel.reminderEnabled.collectAsStateWithLifecycle()
     val remindHr by viewModel.reminderHour.collectAsStateWithLifecycle()
     val remindMin by viewModel.reminderMinute.collectAsStateWithLifecycle()
+    val hasHCPermissions by viewModel.hasHealthConnectPermissions.collectAsStateWithLifecycle()
+    val lastSyncMetadata by viewModel.lastSyncMetadata.collectAsStateWithLifecycle()
+    val syncStatus by viewModel.syncingProgress.collectAsStateWithLifecycle()
 
     var showWeightDialog by remember { mutableStateOf(false) }
     var showCustomIntervalDialog by remember { mutableStateOf(false) }
@@ -1402,17 +1546,9 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean) {
 
         // Connectors for Android Health Connect (Redesigned)
         item {
-            val hasHCPermissions by viewModel.hasHealthConnectPermissions.collectAsStateWithLifecycle()
-            val lastSyncMetadata by viewModel.lastSyncMetadata.collectAsStateWithLifecycle()
             val sdkStatus = remember { viewModel.healthConnectManager.getSdkStatus() }
-            val isAvailable = sdkStatus == androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE
 
-            val requestPermissionsLauncher = rememberLauncherForActivityResult(
-                contract = androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
-            ) { granted ->
-                viewModel.checkHealthConnectPermissions()
-                viewModel.refreshSyncMetadata()
-            }
+            val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -1433,15 +1569,49 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean) {
                             color = MaterialTheme.colorScheme.secondary,
                             letterSpacing = 1.sp
                         )
+
+                        // Redesigned status chip with separate light-theme compliance
+                        val (statusText, statusBg, statusColor) = when (sdkStatus) {
+                            androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE -> {
+                                if (hasHCPermissions) {
+                                    Triple(
+                                        if (isJp) "接続中" else "Connected",
+                                        SystemSuccess.copy(alpha = 0.15f),
+                                        SystemSuccess
+                                    )
+                                } else {
+                                    Triple(
+                                        if (isJp) "アクセス許可が必要" else "Permissions Required",
+                                        SystemWarning.copy(alpha = 0.15f),
+                                        SystemWarning
+                                    )
+                                }
+                            }
+                            androidx.health.connect.client.HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
+                                Triple(
+                                    if (isJp) "更新が必要" else "Update Required",
+                                    SystemWarning.copy(alpha = 0.15f),
+                                    SystemWarning
+                                )
+                            }
+                            else -> {
+                                Triple(
+                                    if (isJp) "非対応" else "Not Supported",
+                                    SystemError.copy(alpha = 0.15f),
+                                    SystemError
+                                )
+                            }
+                        }
+
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(if (isAvailable) Color(0xFF1E3A1E) else Color(0xFF3A1E1E))
+                                .background(statusBg)
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
-                                text = if (isAvailable) (if (isJp) "システム対応" else "SUPPORTED") else (if (isJp) "未対応" else "UNSUPPORTED"),
-                                color = if (isAvailable) Color.Green else Color.Red,
+                                text = statusText.uppercase(Locale.getDefault()),
+                                color = statusColor,
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1461,152 +1631,172 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean) {
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    if (!isAvailable) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
+                    val isAvailable = sdkStatus == androidx.health.connect.client.HealthConnectClient.SDK_AVAILABLE
+
+                    when {
+                        sdkStatus == androidx.health.connect.client.HealthConnectClient.SDK_UNAVAILABLE -> {
                             Text(
-                                text = if (isJp) "対応するヘルスコネクトがインストールされていません。" else "Health Connect is not installed or out-of-date on this device.",
+                                text = if (isJp) "お使いのシステムはヘルスコネクトに対応していません。" else "Health Connect is not supported on this legacy device layout.",
                                 fontSize = 11.sp,
-                                color = LaserCrimson,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.align(Alignment.Start)
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = {
-                                    try {
-                                        context.startActivity(viewModel.healthConnectManager.getPlayStoreIntent())
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("Settings", "Failed opening Play Store help link", e)
-                                    }
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = Color.Black)
-                            ) {
-                                Text(if (isJp) "Google Playから入手する" else "GET HEALTH CONNECT NOW", fontSize = 11.sp, fontWeight = FontWeight.Black)
-                            }
                         }
-                    } else if (!hasHCPermissions) {
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                                    .padding(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info, 
-                                    contentDescription = "Permission requirements", 
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                        sdkStatus == androidx.health.connect.client.HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> {
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = if (isJp) "運動データを書き込むために権限の承認が必要です。" else "Japanese Interval Walking requires reading & writing permissions.",
+                                    text = if (isJp) "ヘルスコネクトの更新が必要です。" else "Health Connect requires an update.",
                                     fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = {
-                                    requestPermissionsLauncher.launch(viewModel.healthConnectManager.requiredPermissions)
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = Color.Black)
-                            ) {
-                                Text(if (isJp) "アクセス権限をリクエスト" else "GRANT HEALTH READ/WRITE PERMISSIONS", fontSize = 11.sp, fontWeight = FontWeight.Black)
-                            }
-                        }
-                    } else {
-                        // All synced status, and manual trigger button
-                        Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(Color(0xFF0F1B12))
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Verified, 
-                                    contentDescription = "Permissions granted", 
-                                    tint = Color.Green,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = if (isJp) "権限の承認済み：双方向同期が有効です" else "Authorized: Secure read/write pipeline active.",
-                                    fontSize = 11.sp,
-                                    color = Color.Green,
+                                    color = SystemWarning,
                                     fontWeight = FontWeight.Bold
                                 )
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // Sync statistics data logs
-                            val formattedSyncTime = remember(lastSyncMetadata) {
-                                if (lastSyncMetadata.lastSyncTimestamp > 0L) {
-                                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
-                                    sdf.format(java.util.Date(lastSyncMetadata.lastSyncTimestamp))
-                                } else {
-                                    if (isJp) "同期履歴なし" else "No synced session yet"
-                                }
-                            }
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                    .padding(10.dp)
-                            ) {
-                                Text(
-                                    text = if (isJp) "ヘルスコネクト連携実績" else "CONNECTION PERFORMANCE",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    letterSpacing = 0.5.sp
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = {
+                                        try {
+                                            context.startActivity(viewModel.healthConnectManager.getPlayStoreIntent())
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("Settings", "Failed opening Play Store help link", e)
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
                                 ) {
-                                    Text(text = if (isJp) "最終同期時刻:" else "Sync Time:", fontSize = 11.sp, color = TextMutedGrey)
-                                    Text(text = formattedSyncTime, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Row(
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(text = if (isJp) "最終歩数ボリューム:" else "Last Synced Steps:", fontSize = 11.sp, color = TextMutedGrey)
-                                    Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) "${lastSyncMetadata.lastSyncedStepCount} steps" else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                Row(
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(text = if (isJp) "最終消費カロリー:" else "Last Synced Calories:", fontSize = 11.sp, color = TextMutedGrey)
-                                    Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) String.format(java.util.Locale.getDefault(), "%.1f kcal", lastSyncMetadata.lastSyncedCalories) else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(if (isJp) "ヘルスコネクトを更新する" else "UPDATE HEALTH CONNECT", fontSize = 12.sp, fontWeight = FontWeight.Black)
                                 }
                             }
+                        }
+                        !hasHCPermissions -> {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SystemWarning.copy(alpha = 0.15f))
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info, 
+                                        contentDescription = "Permission requirements", 
+                                        tint = SystemWarning,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isJp) "運動データを書き込むために権限の承認が必要です。" else "Japanese Interval Walking requires reading & writing permissions.",
+                                        fontSize = 11.sp,
+                                        color = SystemWarning,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = {
+                                        android.util.Log.d("HealthConnect", "Dashboard settings MANAGE PERMISSIONS button clicked")
+                                        onConnectHc()
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.secondary,
+                                        contentColor = MaterialTheme.colorScheme.onSecondary
+                                    )
+                                ) {
+                                    Text(if (isJp) "アクセス権限を許可する" else "MANAGE PERMISSIONS", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
+                        }
+                        else -> {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(SystemSuccess.copy(alpha = 0.15f))
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Verified, 
+                                        contentDescription = "Permissions granted", 
+                                        tint = SystemSuccess,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isJp) "権限の承認済み：双方向同期が有効です" else "Authorized: Secure read/write pipeline active.",
+                                        fontSize = 11.sp,
+                                        color = SystemSuccess,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                                Spacer(modifier = Modifier.height(14.dp))
 
-                            Button(
-                                onClick = { viewModel.syncUnsyncedSessions() },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = Color.Black)
-                            ) {
-                                Text(if (isJp) "今すぐ手動同期を開始" else "TRIGGER MANUAL DATA SYNC", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                // Sync statistics data logs
+                                val formattedSyncTime = remember(lastSyncMetadata) {
+                                    if (lastSyncMetadata.lastSyncTimestamp > 0L) {
+                                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
+                                        sdf.format(java.util.Date(lastSyncMetadata.lastSyncTimestamp))
+                                    } else {
+                                        if (isJp) "同期履歴なし" else "No synced session yet"
+                                    }
+                                }
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                        .padding(10.dp)
+                                ) {
+                                    Text(
+                                        text = if (isJp) "ヘルスコネクト連携実績" else "CONNECTION PERFORMANCE",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Row(
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(text = if (isJp) "最終同期時刻:" else "Sync Time:", fontSize = 11.sp, color = TextMutedGrey)
+                                        Text(text = formattedSyncTime, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                    Row(
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(text = if (isJp) "最終歩数ボリューム:" else "Last Synced Steps:", fontSize = 11.sp, color = TextMutedGrey)
+                                        Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) "${lastSyncMetadata.lastSyncedStepCount} steps" else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                    Row(
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(text = if (isJp) "最終消費カロリー:" else "Last Synced Calories:", fontSize = 11.sp, color = TextMutedGrey)
+                                        Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) String.format(java.util.Locale.getDefault(), "%.1f kcal", lastSyncMetadata.lastSyncedCalories) else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                Button(
+                                    onClick = { viewModel.syncUnsyncedSessions() },
+                                    enabled = syncStatus !is WalkingViewModel.SyncStatus.Syncing,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
+                                ) {
+                                    Text(if (isJp) "今すぐ手動同期を開始" else "TRIGGER MANUAL DATA SYNC", fontSize = 12.sp, fontWeight = FontWeight.Black)
+                                }
                             }
                         }
                     }
@@ -1841,14 +2031,14 @@ fun IntervalSettingsCard(customSlow: Int, customFast: Int, customCycles: Int, is
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1881,14 +2071,14 @@ fun PerformanceWeightCard(weight: Float, isJp: Boolean, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -1897,7 +2087,7 @@ fun PerformanceWeightCard(weight: Float, isJp: Boolean, onClick: () -> Unit) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        if (isJp) "消費カロリー調整プロファイル" else "MET CALORIES BIOPHYSICS",
+                        if (isJp) "消費カロリー調整プロファイル" else "CALORIES & WEIGHT",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.secondary,
@@ -2026,11 +2216,11 @@ fun WorkoutReminderSettingCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(24.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Text(
                 text = if (isJp) "毎日リマインダー通知" else "ATHLETE MOTIVATION ALERTS",
                 fontWeight = FontWeight.ExtraBold,
@@ -2077,24 +2267,24 @@ fun DangerZoneCard(isJp: Boolean, onClearAll: () -> Unit) {
     var confirmClick by remember { mutableStateOf(false) }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1F0F12)),
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Color(0xFF5E141B)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Text(
-                text = if (isJp) "危険領域" else "DEVICE DATA RECOVERY",
+                text = if (isJp) "危険領域" else "DELETE WORKOUT HISTORY",
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 11.sp,
-                color = LaserCrimson,
+                color = MaterialTheme.colorScheme.error,
                 letterSpacing = 1.sp
             )
             Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = if (isJp) "全てのパーソナル履歴、サイクル歩数ログを端末から消去します。復元はできません。" else "Irreversibly vaporize local session databases. This wipes compiled athlete metrics from this storage.",
+                text = if (isJp) "全てのパーソナル履歴、サイクル歩数ログを端末から消去します。復元はできません。" else "Irreversibly delete local session databases. This wipes compiled athlete metrics from this storage.",
                 fontSize = 10.sp,
-                color = TextMutedGrey,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 lineHeight = 14.sp
             )
             Spacer(modifier = Modifier.height(14.dp))
@@ -2108,19 +2298,21 @@ fun DangerZoneCard(isJp: Boolean, onClearAll: () -> Unit) {
                         confirmClick = true
                     }
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = LaserCrimson),
-                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                ),
+                shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = if (confirmClick) {
-                        if (isJp) "本当に履歴消去しますか？ (タップで確定)" else "CONFIRM DESTROY ALL RECORDS"
+                        if (isJp) "本当に履歴消去しますか？ (タップで確定)" else "CONFIRM DELETE ALL HISTORY"
                     } else {
-                        if (isJp) "ローカルデータベース全記録削除" else "WIPE COMPLETED SESSIONS HISTORY"
+                        if (isJp) "ローカルデータベース全記録削除" else "DELETE WORKOUT HISTORY"
                     },
                     fontWeight = FontWeight.Black,
-                    fontSize = 12.sp,
-                    color = Color.White
+                    fontSize = 12.sp
                 )
             }
 
@@ -2129,7 +2321,7 @@ fun DangerZoneCard(isJp: Boolean, onClearAll: () -> Unit) {
                     onClick = { confirmClick = false },
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 ) {
-                    Text(if (isJp) "やっぱりやめる" else "CANCEL WIPE OPERATION", color = TextMutedGrey, fontSize = 11.sp)
+                    Text(if (isJp) "やっぱりやめる" else "CANCEL WIPE OPERATION", color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
                 }
             }
         }
@@ -2199,10 +2391,16 @@ fun TrackingHudView(
             }
 
             // Beautiful status pill
+            val runtimeBg = if (state.isRunning) {
+                SystemSuccess.copy(alpha = 0.15f)
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant
+            }
+
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(30.dp))
-                    .background(if (state.isRunning) Color(0xFF1E3A1E) else Color(0xFF333333))
+                    .background(runtimeBg)
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 Text(
@@ -2213,7 +2411,7 @@ fun TrackingHudView(
                     },
                     fontWeight = FontWeight.Black,
                     fontSize = 10.sp,
-                    color = if (state.isRunning) Color.Green else TextMutedGrey
+                    color = if (state.isRunning) SystemSuccess else TextMutedGrey
                 )
             }
         }
@@ -2306,7 +2504,7 @@ fun TrackingHudView(
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, BorderCarbon),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(16.dp)) {

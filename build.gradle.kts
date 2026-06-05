@@ -6,3 +6,21 @@ plugins {
   alias(libs.plugins.roborazzi) apply false
   alias(libs.plugins.secrets) apply false
 }
+
+tasks.register("listFiles") {
+    doLast {
+        println("=== DEEP FILE SEARCH ===")
+        val rootDirFile = layout.projectDirectory.asFile
+        val startDir = rootDirFile.parentFile?.parentFile ?: rootDirFile
+        println("Starting search from: ${startDir.absolutePath}")
+        startDir.walkTopDown().forEach { file ->
+            if (file.isFile && (file.name.endsWith(".png") || file.name.endsWith(".webp") || file.name.contains("attached") || file.name.contains("icon"))) {
+                if (!file.absolutePath.contains("/build/") && !file.absolutePath.contains("/.gradle/")) {
+                    println("${file.absolutePath} (${file.length()} bytes)")
+                }
+            }
+        }
+    }
+}
+
+

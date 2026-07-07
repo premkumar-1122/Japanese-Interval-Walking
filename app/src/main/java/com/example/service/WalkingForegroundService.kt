@@ -120,6 +120,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
     private var isTtsInitialized = false
     
     private var tickerJob: Job? = null
+    private var stopSelfJob: Job? = null
     private var initialStepsInHardware = -1
     private var lastHardwareStepCount = -1
     private var lastCalculationStepCount = 0
@@ -282,6 +283,8 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
     }
 
     private fun startSession() {
+        stopSelfJob?.cancel()
+        stopSelfJob = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             if (!hasActivityRecognitionPermission()) {
                 try {
@@ -381,7 +384,6 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
     }
 
     private fun skipPhase() {
-        speakCue("Next interval.")
         transitionInterval()
     }
 
@@ -441,8 +443,12 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
         }
 
         speakCue("Session completed")
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        stopSelfJob?.cancel()
+        stopSelfJob = serviceScope.launch {
+            delay(5000)
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     private fun startTicker() {
@@ -587,6 +593,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
             slowCompleted++
             nextPhase = Phase.FAST
             nextTimeLeft = fastDurationMinutes * 60
+            speakCue("Slow interval complete. Speed up! Three minutes fast walk starts now.")
         } else {
             fastCompleted++
             nextCycle++
@@ -606,6 +613,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
             }
             nextPhase = Phase.SLOW
             nextTimeLeft = slowDurationMinutes * 60
+            speakCue("Fast interval complete. Slow down! Walk comfortably for recovery.")
         }
 
         activeState = activeState.copy(

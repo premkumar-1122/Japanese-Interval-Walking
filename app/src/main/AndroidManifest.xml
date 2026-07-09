@@ -51,7 +51,8 @@
             
             <!-- Health Connect Permissions Rationale -->
             <intent-filter>
-                <action android:name="androidx.health.permissions.action.SHOW_PERMISSIONS_RATIONALE" />
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 

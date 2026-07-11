@@ -2,16 +2,41 @@
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
 
-# Run and deploy your AI Studio app
+# JIW Tracker (Japanese Interval Walking Tracker)
 
-This contains everything you need to run your app locally.
+An advanced, premium scientific fitness tracker designed to help users execute 信州大学 (Shinshu University) style Interval Walking. The app manages and schedules interval profiles, calculates precise metabolic calorie burns based on walking speeds (easy stroll vs. brisk walk) and body metrics, and syncs seamlessly with Android Health Connect.
 
-View your app in AI Studio: https://ai.studio/apps/7c3713f1-65c4-4415-a61a-6c9a433ea97d
+---
+
+## 🚀 Release v1.0.1 (Minor Release)
+
+This release implements targeted UX bug fixes to improve navigation flow, reduce clinical jargon, and add weight metric configurations.
+
+### 🛠️ Bug Fixes & UX Enhancements
+1. **Health Connect Sync Consolidation:** Removed duplicate sync cards and stats from the Settings screen. Users now see a consolidated `"Connected"` status indicator and a `"Manage Sync"` link redirecting them directly to the **Dashboard** stats screen where sync details reside.
+2. **Safe History Deletion (Danger Zone protection):** 
+   - Swapped the prominent, full-width red filled delete button in settings with a smaller, outlined button.
+   - Added a confirmation `AlertDialog` overlay to prevent accidental profile or session database deletion.
+3. **Approachable Wording (Clinical Copy Removal):** Rewrote clinical, stiff, and enterprise-sounding copy into consumer-friendly alternatives:
+   - `SYSTEM PREFERENCES` → `Settings`
+   - `ATHLETE MOTIVATION ALERTS` → `Reminders`
+   - `CONNECTION PERFORMANCE` → `Sync Status`
+   - `INTERACTIVE SONIC CUES` → `Sounds & Voice`
+   - `ATHLETE DASHBOARD` → `Your Progress`
+   - `CUSTOM INTERVAL DEFINITION` → `Your Interval Settings`
+   - `Weight calibration` → `Weight settings`
+4. **Weight Unit Toggle Support:** Added an interactive `kg` / `lb` segmented unit toggle inside the Settings weight card, enabling display weight conversion and unit-based edit prompts. The preference is persisted across restarts, while internal databases preserve the canonical metrics in kilograms.
+
+---
+
+## 📦 Assets
+- Built debug APK is available at [assets/app-v1.0.1.apk](assets/app-v1.0.1.apk).
+
+---
 
 ## Run Locally
 
 **Prerequisites:**  [Android Studio](https://developer.android.com/studio)
-
 
 1. Open Android Studio
 2. Select **Open** and choose the directory containing this project

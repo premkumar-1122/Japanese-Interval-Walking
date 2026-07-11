@@ -773,7 +773,7 @@ fun CaloriesSlide(isJp: Boolean) {
                     Triple(Icons.Default.Speed, "二つの歩く速さ", "ゆっくり歩いている時と、早く歩いている時の違いをかしこく見分けて計算します。"),
                     Triple(Icons.Default.Info, "楽しく続けるために", "表示される数値は、毎日の健康づくりとやる気を楽しく高めるための優しい目標目安です。")
                 ) else listOf(
-                    Triple(Icons.Default.Scale, "Weight calibration", "Entering your weight helps customize your calorie burn measurements automatically."),
+                    Triple(Icons.Default.Scale, "Weight settings", "Entering your weight helps customize your calorie burn measurements automatically."),
                     Triple(Icons.Default.Speed, "Speed recognition", "We comfortably separate fast walking from easy strolls to measure your effort."),
                     Triple(Icons.Default.Info, "Supportive guide", "Enjoy watching your counts grow as a friendly way to stay active and feel energetic!")
                 )

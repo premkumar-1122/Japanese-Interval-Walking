@@ -1,0 +1,78 @@
+name: Package & Release Android App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag Name (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history to generate release notes from commits
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Build Debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          # Fetch all tags so git describe works correctly
+          git fetch --tags --force
+          
+          # Set the tag name based on the event trigger
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+          else
+            TAG_NAME="${{ github.ref_name }}"
+          fi
+          echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
+          
+          # Determine the previous tag to get commit history in between
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          
+          echo "### Changelog (Recent commits)" > release_notes.md
+          if [ -z "$PREV_TAG" ]; then
+            echo "First release. Commits list:" >> release_notes.md
+            git log -n 15 --pretty=format:"* %s (%h)" >> release_notes.md
+          else
+            echo "Changes since last release ($PREV_TAG):" >> release_notes.md
+            git log ${PREV_TAG}..HEAD --pretty=format:"* %s (%h)" >> release_notes.md
+          fi
+          echo -e "\n" >> release_notes.md
+        shell: bash
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          name: Release ${{ env.TAG_NAME }}
+          body_path: release_notes.md
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -95,6 +95,9 @@ class WalkingViewModel(
     private val _userWeight = MutableStateFlow(sharedPrefs.getFloat("pref_user_weight", 70f))
     val userWeight: StateFlow<Float> = _userWeight.asStateFlow()
 
+    private val _isWeightUnitKg = MutableStateFlow(sharedPrefs.getBoolean("pref_is_weight_unit_kg", true))
+    val isWeightUnitKg: StateFlow<Boolean> = _isWeightUnitKg.asStateFlow()
+
     private val _isVoiceEnabled = MutableStateFlow(sharedPrefs.getBoolean("pref_is_voice_enabled", true))
     val isVoiceEnabled: StateFlow<Boolean> = _isVoiceEnabled.asStateFlow()
 
@@ -286,6 +289,12 @@ class WalkingViewModel(
         val nextMode = !_isDarkTheme.value
         _isDarkTheme.value = nextMode
         sharedPrefs.edit().putBoolean("pref_is_dark_theme", nextMode).apply()
+    }
+
+    fun toggleWeightUnit() {
+        val next = !_isWeightUnitKg.value
+        _isWeightUnitKg.value = next
+        sharedPrefs.edit().putBoolean("pref_is_weight_unit_kg", next).apply()
     }
 
     fun toggleVoice() {

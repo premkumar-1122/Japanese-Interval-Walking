@@ -134,4 +134,34 @@ class ExampleRobolectricTest {
     viewModel.updateWeight(350f) // too high
     assertEquals(300f, viewModel.userWeight.value, 0.001f)
   }
+
+  @Test
+  fun `verify weight unit toggle functionality`() {
+    val context = ApplicationProvider.getApplicationContext<Context>()
+    val app = context.applicationContext as Application
+    val database = AppDatabase.getDatabase(context)
+    val repository = WalkingRepository(database.walkingSessionDao())
+    val viewModel = WalkingViewModel(app, repository)
+
+    // Default weight unit should be true (kg)
+    assertEquals(true, viewModel.isWeightUnitKg.value)
+
+    // Toggle unit
+    viewModel.toggleWeightUnit()
+    assertEquals(false, viewModel.isWeightUnitKg.value)
+
+    // Toggle back
+    viewModel.toggleWeightUnit()
+    assertEquals(true, viewModel.isWeightUnitKg.value)
+  }
+
+  @Test
+  fun `verify weight unit conversions`() {
+    val weightKg = 70f
+    val weightLb = weightKg * 2.20462f
+    assertEquals(154.3234f, weightLb, 0.001f)
+    
+    val backToKg = weightLb / 2.20462f
+    assertEquals(weightKg, backToKg, 0.001f)
+  }
 }

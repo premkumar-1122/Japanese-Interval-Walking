@@ -325,7 +325,12 @@ fun DashboardScreen(
                     0 -> TrainTabScreen(viewModel, isJp, onPermissionRequest = { permissionsGrantedAlert = true })
                     1 -> DashboardStatsTabScreen(viewModel, isJp, historyLog, isInternetOnline, onInternetToggle = { isInternetOnline = !isInternetOnline }, onConnectHc = onConnectHealthConnect)
                     2 -> TechniqueTabScreen(isJp)
-                    3 -> SettingsTabScreen(viewModel, isJp, onConnectHc = onConnectHealthConnect)
+                    3 -> SettingsTabScreen(
+                        viewModel = viewModel,
+                        isJp = isJp,
+                        onConnectHc = onConnectHealthConnect,
+                        onNavigateToDashboard = { selectedTab = 1 }
+                    )
                 }
             }
 
@@ -624,7 +629,7 @@ fun DashboardStatsTabScreen(
         item {
             // Dashboard bold title
             Text(
-                text = if (isJp) "パーソナルスタッツ" else "ATHLETE DASHBOARD",
+                text = if (isJp) "パーソナルスタッツ" else "Your Progress",
                 fontWeight = FontWeight.Black,
                 fontStyle = FontStyle.Italic,
                 fontSize = 28.sp,
@@ -1494,12 +1499,21 @@ data class GuideChapter(
 // TAB 3: SYSTEM SETTINGS, DURATION PARAMETERS
 // ==========================================
 @Composable
-fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: () -> Unit) {
+fun SettingsTabScreen(
+    viewModel: WalkingViewModel,
+    isJp: Boolean,
+    onConnectHc: () -> Unit,
+    onNavigateToDashboard: () -> Unit
+) {
     val context = LocalContext.current
     
     // Core parameters from preferences
     val weight by viewModel.userWeight.collectAsStateWithLifecycle()
-    val weightStr = remember(weight) { mutableStateOf(weight.toString()) }
+    val isWeightUnitKg by viewModel.isWeightUnitKg.collectAsStateWithLifecycle()
+    val weightStr = remember(weight, isWeightUnitKg) {
+        val wt = if (isWeightUnitKg) weight else weight * 2.20462f
+        mutableStateOf(String.format(Locale.US, "%.1f", wt))
+    }
     
     val voiceEnabled by viewModel.isVoiceEnabled.collectAsStateWithLifecycle()
     val audioEnabled by viewModel.isAudioEnabled.collectAsStateWithLifecycle()
@@ -1531,14 +1545,14 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
     ) {
         item {
             Text(
-                text = if (isJp) "システムギヤ設定" else "SYSTEM PREFERENCES",
+                text = if (isJp) "設定" else "Settings",
                 fontWeight = FontWeight.Black,
                 fontStyle = FontStyle.Italic,
                 fontSize = 28.sp,
                 letterSpacing = (-0.5).sp
             )
             Text(
-                text = if (isJp) "運動係数の微調整と周辺センサー機器管理" else "Calibrate biomechanics and active reminders",
+                text = if (isJp) "設定と毎日のリマインダー" else "Your settings and daily reminders",
                 fontSize = 12.sp,
                 color = TextMutedGrey
             )
@@ -1559,7 +1573,9 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
         item {
             PerformanceWeightCard(
                 weight = weight,
+                isWeightUnitKg = isWeightUnitKg,
                 isJp = isJp,
+                onUnitToggle = { viewModel.toggleWeightUnit() },
                 onClick = { showWeightDialog = true }
             )
         }
@@ -1756,15 +1772,16 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
                             }
                         }
                         else -> {
-                            Column(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(SystemSuccess.copy(alpha = 0.15f))
-                                        .padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(SystemSuccess.copy(alpha = 0.15f))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Default.Verified, 
                                         contentDescription = "Permissions granted", 
@@ -1773,73 +1790,23 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (isJp) "権限の承認済み：双方向同期が有効です" else "Authorized: Secure read/write pipeline active.",
-                                        fontSize = 11.sp,
+                                        text = if (isJp) "接続済み" else "Connected",
+                                        fontSize = 12.sp,
                                         color = SystemSuccess,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
-
-                                Spacer(modifier = Modifier.height(14.dp))
-
-                                // Sync statistics data logs
-                                val formattedSyncTime = remember(lastSyncMetadata) {
-                                    if (lastSyncMetadata.lastSyncTimestamp > 0L) {
-                                        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault())
-                                        sdf.format(java.util.Date(lastSyncMetadata.lastSyncTimestamp))
-                                    } else {
-                                        if (isJp) "同期履歴なし" else "No synced session yet"
-                                    }
-                                }
-
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                        .padding(10.dp)
+                                TextButton(
+                                    onClick = onNavigateToDashboard,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    modifier = Modifier.height(28.dp)
                                 ) {
                                     Text(
-                                        text = if (isJp) "ヘルスコネクト連携実績" else "CONNECTION PERFORMANCE",
-                                        fontSize = 9.sp,
+                                        text = if (isJp) "同期を管理" else "Manage Sync",
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.secondary,
-                                        letterSpacing = 0.5.sp
+                                        color = MaterialTheme.colorScheme.primary
                                     )
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Row(
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(text = if (isJp) "最終同期時刻:" else "Sync Time:", fontSize = 11.sp, color = TextMutedGrey)
-                                        Text(text = formattedSyncTime, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                    Row(
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(text = if (isJp) "最終歩数ボリューム:" else "Last Synced Steps:", fontSize = 11.sp, color = TextMutedGrey)
-                                        Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) "${lastSyncMetadata.lastSyncedStepCount} steps" else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                    Row(
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text(text = if (isJp) "最終消費カロリー:" else "Last Synced Calories:", fontSize = 11.sp, color = TextMutedGrey)
-                                        Text(text = if (lastSyncMetadata.lastSyncTimestamp > 0L) String.format(java.util.Locale.getDefault(), "%.1f kcal", lastSyncMetadata.lastSyncedCalories) else "-", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(14.dp))
-
-                                Button(
-                                    onClick = { viewModel.syncUnsyncedSessions() },
-                                    enabled = syncStatus !is WalkingViewModel.SyncStatus.Syncing,
-                                    shape = RoundedCornerShape(12.dp),
-                                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary, contentColor = MaterialTheme.colorScheme.onSecondary)
-                                ) {
-                                    Text(if (isJp) "今すぐ手動同期を開始" else "TRIGGER MANUAL DATA SYNC", fontSize = 12.sp, fontWeight = FontWeight.Black)
                                 }
                             }
                         }
@@ -1858,7 +1825,7 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = if (isJp) "音声案内コーチ" else "INTERACTIVE SONIC CUES",
+                        text = if (isJp) "音声案内コーチ" else "Sounds & Voice",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.primary,
@@ -1912,7 +1879,13 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
             text = {
                 Column {
                     Text(
-                        text = if (isJp) "よりあなたの歩行状態に合わせた、正確な消費カロリーをスマートに計算します。体重(kg)：" else "Entering your body weight helps us estimate your burned calories accurately during your 30-minute walking sessions.",
+                        text = if (isJp) {
+                            if (isWeightUnitKg) "よりあなたの歩行状態に合わせた、正確な消費カロリーをスマートに計算します。体重(kg)："
+                            else "よりあなたの歩行状態に合わせた、正確な消費カロリーをスマートに計算します。体重(lb)："
+                        } else {
+                            if (isWeightUnitKg) "Entering your body weight helps us estimate your burned calories accurately during your 30-minute walking sessions. Weight (kg):"
+                            else "Entering your body weight helps us estimate your burned calories accurately during your 30-minute walking sessions. Weight (lb):"
+                        },
                         fontSize = 12.sp,
                         color = TextMutedGrey,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -1920,6 +1893,7 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
                     OutlinedTextField(
                         value = weightStr.value,
                         onValueChange = { weightStr.value = it },
+                        label = { Text(if (isJp) (if (isWeightUnitKg) "体重 (kg)" else "体重 (lb)") else (if (isWeightUnitKg) "Weight (kg)" else "Weight (lb)")) },
                         shape = RoundedCornerShape(8.dp),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -1934,7 +1908,8 @@ fun SettingsTabScreen(viewModel: WalkingViewModel, isJp: Boolean, onConnectHc: (
                 Button(
                     onClick = {
                         val parsed = weightStr.value.toFloatOrNull() ?: 70f
-                        viewModel.setOnboardingWeight(parsed)
+                        val parsedInKg = if (isWeightUnitKg) parsed else parsed / 2.20462f
+                        viewModel.setOnboardingWeight(parsedInKg)
                         showWeightDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
@@ -2091,7 +2066,7 @@ fun IntervalSettingsCard(customSlow: Int, customFast: Int, customCycles: Int, is
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        if (isJp) "カスタム間歩の時間設定" else "CUSTOM INTERVAL DEFINITION",
+                        if (isJp) "カスタム間歩の時間設定" else "Your Interval Settings",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.primary,
@@ -2111,7 +2086,19 @@ fun IntervalSettingsCard(customSlow: Int, customFast: Int, customCycles: Int, is
 }
 
 @Composable
-fun PerformanceWeightCard(weight: Float, isJp: Boolean, onClick: () -> Unit) {
+fun PerformanceWeightCard(
+    weight: Float,
+    isWeightUnitKg: Boolean,
+    isJp: Boolean,
+    onUnitToggle: () -> Unit,
+    onClick: () -> Unit
+) {
+    val displayWeight = if (isWeightUnitKg) {
+        String.format(Locale.US, "%.1f kg", weight)
+    } else {
+        String.format(Locale.US, "%.1f lb", weight * 2.20462f)
+    }
+
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -2138,11 +2125,46 @@ fun PerformanceWeightCard(weight: Float, isJp: Boolean, onClick: () -> Unit) {
                         letterSpacing = 0.5.sp
                     )
                     Text(
-                        if (isJp) "設定された運動体重 : $weight kg" else "Registered athlete weight: $weight kg",
+                        if (isJp) "あなたの体重 : $displayWeight" else "Your weight: $displayWeight",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(top = 2.dp)
                     )
+                    
+                    // Segmented control
+                    Row(
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val kgBg = if (isWeightUnitKg) MaterialTheme.colorScheme.primary else Color.Transparent
+                        val kgColor = if (isWeightUnitKg) Color.Black else MaterialTheme.colorScheme.onSurface
+                        val lbBg = if (!isWeightUnitKg) MaterialTheme.colorScheme.primary else Color.Transparent
+                        val lbColor = if (!isWeightUnitKg) Color.Black else MaterialTheme.colorScheme.onSurface
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(kgBg)
+                                .clickable { if (!isWeightUnitKg) onUnitToggle() }
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("kg", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = kgColor)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(lbBg)
+                                .clickable { if (isWeightUnitKg) onUnitToggle() }
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text("lb", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = lbColor)
+                        }
+                    }
                 }
             }
             Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit weight", tint = TextMutedGrey, modifier = Modifier.size(16.dp))
@@ -2266,7 +2288,7 @@ fun WorkoutReminderSettingCard(
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Text(
-                text = if (isJp) "毎日リマインダー通知" else "ATHLETE MOTIVATION ALERTS",
+                text = if (isJp) "毎日リマインダー通知" else "Reminders",
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.primary,
@@ -2308,65 +2330,90 @@ fun WorkoutReminderSettingCard(
 
 @Composable
 fun DangerZoneCard(isJp: Boolean, onClearAll: () -> Unit) {
-    var confirmClick by remember { mutableStateOf(false) }
+    var showConfirmDialog by remember { mutableStateOf(false) }
+
+    if (showConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showConfirmDialog = false },
+            title = {
+                Text(
+                    text = if (isJp) "ワークアウト履歴を削除しますか？" else "Delete workout history?",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (isJp) 
+                        "すべてのログに記録されたセッションが完全に削除されます。この操作は取り消せません。" 
+                    else 
+                        "This permanently removes all logged sessions. This can't be undone."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onClearAll()
+                        showConfirmDialog = false
+                    }
+                ) {
+                    Text(
+                        text = if (isJp) "削除" else "Delete",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirmDialog = false }) {
+                    Text(
+                        text = if (isJp) "キャンセル" else "Cancel",
+                        color = TextMutedGrey
+                    )
+                }
+            }
+        )
+    }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(24.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = if (isJp) "危険領域" else "DELETE WORKOUT HISTORY",
+                text = if (isJp) "危険領域" else "DANGER ZONE",
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.error,
                 letterSpacing = 1.sp
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = if (isJp) "全てのパーソナル履歴、サイクル歩数ログを端末から消去します。復元はできません。" else "Irreversibly delete local session databases. This wipes compiled athlete metrics from this storage.",
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                lineHeight = 14.sp
+                text = if (isJp) 
+                    "全てのパーソナル履歴、サイクル歩数ログを端末から消去します。復元はできません。" 
+                else 
+                    "Permanently delete all workout history. This will clear all your session logs from this device.",
+                fontSize = 11.sp,
+                color = TextMutedGrey,
+                lineHeight = 16.sp
             )
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
-            Button(
-                onClick = { 
-                    if (confirmClick) {
-                        onClearAll()
-                        confirmClick = false
-                    } else {
-                        confirmClick = true
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error,
-                    contentColor = MaterialTheme.colorScheme.onError
+            OutlinedButton(
+                onClick = { showConfirmDialog = true },
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
                 ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.align(Alignment.Start)
             ) {
                 Text(
-                    text = if (confirmClick) {
-                        if (isJp) "本当に履歴消去しますか？ (タップで確定)" else "CONFIRM DELETE ALL HISTORY"
-                    } else {
-                        if (isJp) "ローカルデータベース全記録削除" else "DELETE WORKOUT HISTORY"
-                    },
-                    fontWeight = FontWeight.Black,
-                    fontSize = 12.sp
+                    text = if (isJp) "履歴を消去する" else "Delete Workout History",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
                 )
-            }
-
-            if (confirmClick) {
-                TextButton(
-                    onClick = { confirmClick = false },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Text(if (isJp) "やっぱりやめる" else "CANCEL WIPE OPERATION", color = MaterialTheme.colorScheme.error, fontSize = 11.sp)
-                }
             }
         }
     }

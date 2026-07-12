@@ -32,7 +32,11 @@ jobs:
 
       - name: Decode Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/my-upload-key.jks
+          if [ -f "keystore-base64.txt" ]; then
+            base64 --decode keystore-base64.txt > ${{ github.workspace }}/my-upload-key.jks
+          else
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/my-upload-key.jks
+          fi
 
       - name: Build Release APK
         run: |

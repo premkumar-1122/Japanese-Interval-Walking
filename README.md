@@ -8,6 +8,27 @@ An advanced, premium scientific fitness tracker designed to help users execute �
 
 ---
 
+## 🚀 Release v1.0.2 (Feature Release)
+
+This release introduces a fully-featured onboarding flow with Jetpack DataStore persistence, segmented workout cycle tracking, and light mode visual enhancements.
+
+### ✨ New Features & Key Additions
+1. **Interactive Onboarding Wizard:**
+   - Designed a multi-step introduction flow (`OnboardingScreen`) to guide users through feature explanations (Steps, Metabolic Insights, Calorie burning equations).
+   - Collects initial user metrics (body weight calibration, weekly walk goals) to customize calculation models.
+   - Integrated live permission checks and requests for physical Activity Recognition, System Notifications, and Android Health Connect permissions directly in-app.
+2. **DataStore Persistence Layer:**
+   - Created `OnboardingPrefs` utilizing Jetpack DataStore for thread-safe, reactive key-value storage.
+   - Persists onboarding status, user weight, weekly walk goal, and session seeding configuration across application restarts.
+3. **Advanced Session HUD Segmenting:**
+   - Replaced continuous progress bars with a discrete Segmented Progress Bar during active interval walks.
+   - Animating completed cycles (high-intensity fast walk segments vs easy strolls) and features a pulse animation on the active segment.
+4. **Light Mode & Accessibility Polish:**
+   - Extended the CarbonBlack/MinimalLight theme to HUD metrics and action buttons (Play, Pause, Stop, Skip).
+   - Standardized icons to use auto-mirrored variants where appropriate.
+
+---
+
 ## 🚀 Release v1.0.1 (Minor Release)
 
 This release implements targeted UX bug fixes to improve navigation flow, reduce clinical jargon, and add weight metric configurations.

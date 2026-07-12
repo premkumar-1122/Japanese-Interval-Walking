@@ -42,11 +42,35 @@ class WalkingViewModel(
             initialValue = null
         )
 
+    val weeklyWalkGoal: StateFlow<Int> = onboardingPrefs.weeklyWalkGoal
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = 5
+        )
+
     fun setOnboardingCompleted(completed: Boolean) {
         viewModelScope.launch {
             onboardingPrefs.setOnboardingCompleted(completed)
             if (completed) {
                 com.example.data.OnboardingAnalytics.logEvent("onboarding_completed")
+                if (!onboardingPrefs.hasSeededSession0.first()) {
+                    val session0 = com.example.data.WalkingSession(
+                        dateMillis = System.currentTimeMillis(),
+                        durationSeconds = 0L,
+                        steps = 0,
+                        calories = 0.0,
+                        avgCadence = 0.0,
+                        avgPace = 0.0,
+                        slowCyclesCount = 0,
+                        fastCyclesCount = 0,
+                        totalCycles = 0,
+                        isSyncedToGoogleFit = false,
+                        isSyncedToHealthConnect = false
+                    )
+                    repository.insertSession(session0)
+                    onboardingPrefs.setSeededSession0(true)
+                }
             } else {
                 com.example.data.OnboardingAnalytics.logEvent("onboarding_started")
             }
@@ -58,6 +82,13 @@ class WalkingViewModel(
             onboardingPrefs.setUserWeight(weight)
             updateWeight(weight) // keeps sharedPrefs weight synced so existing service reads correct weight
             com.example.data.OnboardingAnalytics.logEvent("weight_saved", mapOf("weight" to weight))
+        }
+    }
+
+    fun setWeeklyWalkGoal(goal: Int) {
+        viewModelScope.launch {
+            onboardingPrefs.setWeeklyWalkGoal(goal)
+            com.example.data.OnboardingAnalytics.logEvent("weekly_goal_saved", mapOf("goal" to goal))
         }
     }
 

@@ -40,3 +40,7 @@ val SystemError = Color(0xFFFF4D6D)      // Soft athletic red
 val SystemWarning = Color(0xFFFFB84D)    // Scientific amber alert
 val SystemSuccess = Color(0xFF22C55E)    // Athletic green pulse
 val SystemInfo = Color(0xFF00D9FF)       // Scientific cyan tracker
+
+// Goal Gradient Accents
+val WarmGold = Color(0xFFFFD700)         // Premium Warm Gold accent
+

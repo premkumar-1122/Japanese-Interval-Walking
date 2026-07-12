@@ -55,6 +55,8 @@ import com.example.ui.WalkingViewModel
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
+import com.example.data.JIWConfig
+import kotlinx.coroutines.delay
 
 private val TextMutedGrey: Color
     @Composable
@@ -609,6 +611,7 @@ fun DashboardStatsTabScreen(
     val isHcConnected by viewModel.isHealthConnectConnected.collectAsStateWithLifecycle()
     val hasHCPermissions by viewModel.hasHealthConnectPermissions.collectAsStateWithLifecycle()
     val lastSyncMetadata by viewModel.lastSyncMetadata.collectAsStateWithLifecycle()
+    val weeklyWalkGoal by viewModel.weeklyWalkGoal.collectAsStateWithLifecycle()
 
     // Share dialog record holder
     var activeShareSession by remember { mutableStateOf<WalkingSession?>(null) }
@@ -618,6 +621,25 @@ fun DashboardStatsTabScreen(
     val totalBurn = history.sumOf { it.calories }
     val totalSteps = history.sumOf { it.steps }
     val totalMinutes = history.sumOf { it.durationSeconds } / 60
+
+    // Week start boundary calculation (Monday 00:00 local time)
+    val startOfWeekMillis = remember {
+        val calendar = java.util.Calendar.getInstance()
+        calendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        calendar.set(java.util.Calendar.MINUTE, 0)
+        calendar.set(java.util.Calendar.SECOND, 0)
+        calendar.set(java.util.Calendar.MILLISECOND, 0)
+        val dayOfWeek = calendar.get(java.util.Calendar.DAY_OF_WEEK)
+        val daysSinceMonday = if (dayOfWeek == java.util.Calendar.SUNDAY) 6 else dayOfWeek - java.util.Calendar.MONDAY
+        calendar.add(java.util.Calendar.DAY_OF_YEAR, -daysSinceMonday)
+        calendar.timeInMillis
+    }
+
+    val weeklySessions = remember(history, startOfWeekMillis) {
+        history.filter { it.dateMillis >= startOfWeekMillis }
+    }
+    val weeklyCount = weeklySessions.size
+
 
     LazyColumn(
         modifier = Modifier
@@ -640,6 +662,91 @@ fun DashboardStatsTabScreen(
                 fontSize = 12.sp,
                 color = TextMutedGrey
             )
+        }
+
+        // FEATURE 1: Onboarding-seeded weekly goal ring
+        item {
+            val percent = (weeklyCount * 100 / weeklyWalkGoal).coerceAtMost(100)
+            val encouragingLabel = if (isJp) "すでに${percent}%達成しています！" else "You're already ${percent}% there!"
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
+                    val trackColor = if (isLightMode) MaterialTheme.colorScheme.outline else BorderCarbon
+                    val primaryColor = MaterialTheme.colorScheme.primary
+
+                    Box(
+                        modifier = Modifier
+                            .size(90.dp)
+                            .drawBehind {
+                                drawCircle(
+                                    color = trackColor,
+                                    style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round),
+                                    radius = (size.width - 8.dp.toPx()) / 2f
+                                )
+                                val sweepAngle = 360f * (weeklyCount.toFloat() / weeklyWalkGoal.toFloat()).coerceIn(0f, 1f)
+                                drawArc(
+                                    color = primaryColor,
+                                    startAngle = -90f,
+                                    sweepAngle = sweepAngle,
+                                    useCenter = false,
+                                    style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round),
+                                    size = size.copy(
+                                        width = size.width - 8.dp.toPx(),
+                                        height = size.height - 8.dp.toPx()
+                                    ),
+                                    topLeft = Offset(4.dp.toPx(), 4.dp.toPx())
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "$weeklyCount/$weeklyWalkGoal",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            color = TextOnObsidian
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isJp) "今週の目標" else "WEEKLY SESSIONS GOAL",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.primary,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = encouragingLabel,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                            color = TextOnObsidian
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = if (isJp) {
+                                "目標：週に${weeklyWalkGoal}回のワークアウト"
+                            } else {
+                                "Goal: ${weeklyWalkGoal} sessions this week"
+                            },
+                            fontSize = 11.sp,
+                            color = TextMutedGrey
+                        )
+                    }
+                }
+            }
         }
 
         // Giant stats strip (Nike Run style)
@@ -1187,6 +1294,7 @@ fun HistoryRowCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
+            val isSession0 = session.steps == 0 && session.durationSeconds == 0L && session.totalCycles == 0
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1195,7 +1303,11 @@ fun HistoryRowCard(
                 Column {
                     Text(text = dateFmt, fontSize = 11.sp, color = TextMutedGrey)
                     Text(
-                        text = "${session.steps} ${if (isJp) "歩" else "steps"}",
+                        text = if (isSession0) {
+                            if (isJp) "準備完了！" else "Getting Ready!"
+                        } else {
+                            "${session.steps} ${if (isJp) "歩" else "steps"}"
+                        },
                         fontWeight = FontWeight.Black,
                         fontSize = 18.sp
                     )
@@ -1252,17 +1364,31 @@ fun HistoryRowCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                MetricColumn(label = "TIME", valStr = durationStr)
-                MetricColumn(label = "CALORIES", valStr = "${String.format("%.1f", session.calories)} kcal")
-                MetricColumn(label = "AVG CADENCE", valStr = "${String.format("%.0f", session.avgCadence)} spm")
-                MetricColumn(label = "AVG PACE", valStr = "${String.format("%.1f", session.avgPace)} m/k")
+                if (isSession0) {
+                    MetricColumn(label = "TIME", valStr = "Session 0")
+                    MetricColumn(label = "CALORIES", valStr = "0 kcal")
+                    MetricColumn(label = "AVG CADENCE", valStr = "--")
+                    MetricColumn(label = "AVG PACE", valStr = "--")
+                } else {
+                    MetricColumn(label = "TIME", valStr = durationStr)
+                    MetricColumn(label = "CALORIES", valStr = "${String.format("%.1f", session.calories)} kcal")
+                    MetricColumn(label = "AVG CADENCE", valStr = "${String.format("%.0f", session.avgCadence)} spm")
+                    MetricColumn(label = "AVG PACE", valStr = "${String.format("%.1f", session.avgPace)} m/k")
+                }
             }
             
             Text(
-                text = if (isJp) 
-                    "インターバル交代数: ${session.totalCycles} サイクル (低速: ${session.slowCyclesCount}分 / 高速: ${session.fastCyclesCount}分)"
-                else 
-                    "Interval breakdown: ${session.totalCycles} cycles (Recovery: ${session.slowCyclesCount}m / Speed: ${session.fastCyclesCount}m)",
+                text = if (isSession0) {
+                    if (isJp)
+                        "おめでとうございます！準備完了しました。"
+                    else
+                        "Getting Ready: Onboarding completed successfully."
+                } else {
+                    if (isJp) 
+                        "インターバル交代数: ${session.totalCycles} サイクル (低速: ${session.slowCyclesCount}分 / 高速: ${session.fastCyclesCount}分)"
+                    else 
+                        "Interval breakdown: ${session.totalCycles} cycles (Recovery: ${session.slowCyclesCount}m / Speed: ${session.fastCyclesCount}m)"
+                },
                 fontSize = 10.sp,
                 color = TextMutedGrey,
                 modifier = Modifier.padding(top = 10.dp)
@@ -1532,9 +1658,12 @@ fun SettingsTabScreen(
     val lastSyncMetadata by viewModel.lastSyncMetadata.collectAsStateWithLifecycle()
     val syncStatus by viewModel.syncingProgress.collectAsStateWithLifecycle()
 
+    val weeklyWalkGoal by viewModel.weeklyWalkGoal.collectAsStateWithLifecycle()
+
     var showWeightDialog by remember { mutableStateOf(false) }
     var showCustomIntervalDialog by remember { mutableStateOf(false) }
     var showAlarmDialog by remember { mutableStateOf(false) }
+    var showWeeklyGoalDialog by remember { mutableStateOf(false) }
 
     LazyColumn(
         modifier = Modifier
@@ -1577,6 +1706,15 @@ fun SettingsTabScreen(
                 isJp = isJp,
                 onUnitToggle = { viewModel.toggleWeightUnit() },
                 onClick = { showWeightDialog = true }
+            )
+        }
+
+        // Weekly Walk Goal selector (Issue 2)
+        item {
+            WeeklyGoalSettingsCard(
+                goal = weeklyWalkGoal,
+                isJp = isJp,
+                onClick = { showWeeklyGoalDialog = true }
             )
         }
 
@@ -1925,6 +2063,44 @@ fun SettingsTabScreen(
         )
     }
 
+    // Weekly Goal configurator dialog (Issue 2)
+    if (showWeeklyGoalDialog) {
+        var goalVal by remember { mutableStateOf(weeklyWalkGoal) }
+        AlertDialog(
+            onDismissRequest = { showWeeklyGoalDialog = false },
+            title = { Text(if (isJp) "週間目標の設定" else "Set Weekly Walk Goal") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text(if (isJp) "一週間に何回インターバル速歩を行うか設定します（月曜日〜日曜日）。" else "Set how many walks you want to complete per week (Monday–Sunday).", fontSize = 11.sp, color = TextMutedGrey)
+                    
+                    IntSliderGroup(
+                        label = if (isJp) "目標回数" else "WEEKLY GOAL",
+                        currentVal = goalVal,
+                        minRange = 1,
+                        maxRange = 7,
+                        onValChange = { goalVal = it }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.setWeeklyWalkGoal(goalVal)
+                        showWeeklyGoalDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text(if (isJp) "目標を保存" else "SAVE GOAL", color = Color.Black, fontWeight = FontWeight.Black)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWeeklyGoalDialog = false }) {
+                    Text(if (isJp) "キャンセル" else "CANCEL", color = TextMutedGrey)
+                }
+            }
+        )
+    }
+
     // Custom Intervals configurator dialog
     if (showCustomIntervalDialog) {
         var slowVal by remember { mutableStateOf(customSlow) }
@@ -2168,6 +2344,46 @@ fun PerformanceWeightCard(
                 }
             }
             Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit weight", tint = TextMutedGrey, modifier = Modifier.size(16.dp))
+        }
+    }
+}
+
+@Composable
+fun WeeklyGoalSettingsCard(goal: Int, isJp: Boolean, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = Icons.Default.DateRange, contentDescription = "weekly goal settings", tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        if (isJp) "週間目標の設定" else "WEEKLY GOAL",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 0.5.sp
+                      )
+                    Text(
+                        if (isJp) "目標: 週に ${goal} 回の速歩" else "Goal: $goal walks / week (Mon-Sun)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+            Icon(imageVector = Icons.Default.Edit, contentDescription = "Edit weekly goal", tint = TextMutedGrey, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -2435,9 +2651,31 @@ fun TrackingHudView(
     val timeLeft = state.timeLeftInPhaseSeconds
     val percentTimeFraction = if (totalInPhase > 0) timeLeft.toFloat() / totalInPhase.toFloat() else 1f
 
+    val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
     val isPhaseFast = state.currentPhase == WalkingForegroundService.Phase.FAST
-    val phaseColorAccent = if (isPhaseFast) LaserCrimson else MaterialTheme.colorScheme.secondary
-    val phaseThemeBg = if (isPhaseFast) Color(0xFF1E0B0F) else Color(0xFF071C22)
+    val phaseColorAccent = if (isPhaseFast) {
+        if (isLightMode) MaterialTheme.colorScheme.tertiary else LaserCrimson
+    } else {
+        MaterialTheme.colorScheme.secondary
+    }
+    val phaseThemeBg = if (isLightMode) {
+        if (isPhaseFast) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer
+    } else {
+        if (isPhaseFast) Color(0xFF1E0B0F) else Color(0xFF071C22)
+    }
+
+    val isFinalStretch = state.currentCycle == state.totalCycles
+
+    val pulseTransition = rememberInfiniteTransition(label = "hudPulse")
+    val pulseAlpha by pulseTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
 
     val displayedName = if (isPhaseFast) {
         if (isJp) "早歩き" else "FAST WALK"
@@ -2445,10 +2683,14 @@ fun TrackingHudView(
         if (isJp) "ゆっくり歩き" else "SLOW RECOVERY"
     }
 
-    val actionHintText = if (isPhaseFast) {
-        if (isJp) "全力を振り絞って大きく腕を振ろう！" else "MAX EFFORT · SWING ARMS BACKWARD!"
+    val actionHintText = if (isFinalStretch) {
+        if (isJp) "ラストスパート！あと少し！" else "Final stretch — almost there!"
     } else {
-        if (isJp) "呼吸を整えてリラックス歩き" else "DEEP NASAL BREATH · EASY STEPS"
+        if (isPhaseFast) {
+            if (isJp) "全力を振り絞って大きく腕を振ろう！" else "MAX EFFORT · SWING ARMS BACKWARD!"
+        } else {
+            if (isJp) "呼吸を整えてリラックス歩き" else "DEEP NASAL BREATH · EASY STEPS"
+        }
     }
 
     Column(
@@ -2509,24 +2751,34 @@ fun TrackingHudView(
         }
 
         // Giant Concentric Interval Circle Head (Nike / Adidas style)
+        val backGlowColor = if (isLightMode) MaterialTheme.colorScheme.surface else Color.Black.copy(alpha = 0.4f)
+        val structuralRingColor = if (isLightMode) MaterialTheme.colorScheme.outline else BorderCarbon
+
         Box(
             modifier = Modifier
                 .size(260.dp)
                 .drawBehind {
                     // Back glow ring
                     drawCircle(
-                        color = Color.Black.copy(alpha = 0.4f),
+                        color = backGlowColor,
                         radius = size.width / 2f
                     )
+                    // Pulsing outer gold glow when in final stretch
+                    if (isFinalStretch) {
+                        drawCircle(
+                            color = WarmGold.copy(alpha = 0.15f * pulseAlpha),
+                            radius = size.width / 2f
+                        )
+                    }
                     // Structural Ring
                     drawCircle(
-                        color = BorderCarbon,
+                        color = structuralRingColor,
                         style = Stroke(width = 16.dp.toPx(), cap = StrokeCap.Round),
                         radius = (size.width - 16.dp.toPx()) / 2f
                     )
                     // Active Sprint / Recovery running ring
                     drawArc(
-                        color = phaseColorAccent,
+                        color = if (isFinalStretch) WarmGold else phaseColorAccent,
                         startAngle = -90f,
                         sweepAngle = 360f * percentTimeFraction,
                         useCenter = false,
@@ -2554,7 +2806,7 @@ fun TrackingHudView(
                     text = displayedName,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = phaseColorAccent,
+                    color = if (isFinalStretch) WarmGold else phaseColorAccent,
                     letterSpacing = 2.sp,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -2604,7 +2856,7 @@ fun TrackingHudView(
                     text = actionHintText,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = phaseColorAccent,
+                    color = if (isFinalStretch) WarmGold else phaseColorAccent,
                     fontStyle = FontStyle.Italic,
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
@@ -2617,7 +2869,7 @@ fun TrackingHudView(
                     HudTelemetryMetric(
                         label = if (isJp) "現在の歩数" else "STEPS TRACKED",
                         value = "${state.steps}",
-                        accentColor = MaterialTheme.colorScheme.primary
+                        accentColor = if (isFinalStretch) WarmGold else MaterialTheme.colorScheme.primary
                     )
                     HudTelemetryMetric(
                         label = if (isJp) "ケイデンス (歩/分)" else "CADENCE SPM",
@@ -2637,12 +2889,12 @@ fun TrackingHudView(
                     HudTelemetryMetric(
                         label = if (isJp) "カロリー (kcal)" else "CAL BURNED",
                         value = String.format(Locale.getDefault(), "%.1f", state.calories),
-                        accentColor = LaserCrimson
+                        accentColor = if (isLightMode) MaterialTheme.colorScheme.tertiary else LaserCrimson
                     )
                     HudTelemetryMetric(
                         label = if (isJp) "推定ペース (分/km)" else "PACE ESTIMATE",
                         value = String.format(Locale.getDefault(), "%.1f", state.pace),
-                        accentColor = RecoveryTeal
+                        accentColor = if (isLightMode) MaterialTheme.colorScheme.secondary else RecoveryTeal
                     )
                 }
             }
@@ -2661,10 +2913,14 @@ fun TrackingHudView(
             val timerStr = String.format(Locale.getDefault(), "%02d:%02d / %02d:%02d", elapsedMin, elapsedSec, totalMin, totalSec)
             
             val targetMinutesRounded = (totalSecExpected / 60f).toInt()
-            val progressText = if (isJp) {
-                "セッション進捗: ${String.format(Locale.getDefault(), "%02d:%02d", elapsedMin, elapsedSec)} （目標 ${targetMinutesRounded}分）"
+            val progressText = if (isFinalStretch) {
+                if (isJp) "ラストスパート！あと少し！" else "Final stretch — almost there!"
             } else {
-                "SESSION PROGRESS: ${String.format(Locale.getDefault(), "%02d:%02d", elapsedMin, elapsedSec)} (OUT OF ${targetMinutesRounded} MINS)"
+                if (isJp) {
+                    "セッション進捗: ${String.format(Locale.getDefault(), "%02d:%02d", elapsedMin, elapsedSec)} （目標 ${targetMinutesRounded}分）"
+                } else {
+                    "SESSION PROGRESS: ${String.format(Locale.getDefault(), "%02d:%02d", elapsedMin, elapsedSec)} (OUT OF ${targetMinutesRounded} MINS)"
+                }
             }
 
             Row(
@@ -2676,20 +2932,83 @@ fun TrackingHudView(
                     text = progressText, 
                     fontSize = 10.sp, 
                     fontWeight = FontWeight.Bold, 
-                    color = TextMutedGrey
+                    color = if (isFinalStretch) WarmGold else TextMutedGrey
                 )
-                Text(text = "${(totalSessionPct * 100f).toInt()}%", fontSize = 11.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "${(totalSessionPct * 100f).toInt()}%", 
+                    fontSize = 11.sp, 
+                    fontWeight = FontWeight.Black, 
+                    color = if (isFinalStretch) WarmGold else MaterialTheme.colorScheme.primary
+                )
             }
-            LinearProgressIndicator(
-                progress = totalSessionPct,
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = BorderCarbon,
-                strokeCap = StrokeCap.Round,
+            
+            // FEATURE 2: Segmented in-session progress bar
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(6.dp)
-                    .padding(top = 4.dp)
-            )
+                    .height(10.dp)
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val trackColor = if (isLightMode) MaterialTheme.colorScheme.outline else BorderCarbon
+                
+                // Set up discrete on/off pulse timer for active progress segment (Issue 3)
+                var segmentFilled by remember(state.currentCycle) { mutableStateOf(true) }
+                LaunchedEffect(state.currentCycle, state.isRunning) {
+                    if (state.isRunning) {
+                        while (true) {
+                            delay(1000)
+                            segmentFilled = !segmentFilled
+                        }
+                    } else {
+                        segmentFilled = true
+                    }
+                }
+
+                for (i in 1..state.totalCycles) {
+                    val isCompleted = i <= state.fastCyclesCompleted
+                    val isInProgress = i == state.currentCycle
+                    
+                    val segmentColor = when {
+                        isCompleted -> if (isFinalStretch) WarmGold else MaterialTheme.colorScheme.primary
+                        isInProgress -> {
+                            val baseColor = if (isFinalStretch) WarmGold else MaterialTheme.colorScheme.primary
+                            if (segmentFilled) baseColor else Color.Transparent
+                        }
+                        else -> trackColor
+                    }
+
+                    val borderColor = if (isInProgress) {
+                        if (isFinalStretch) WarmGold else MaterialTheme.colorScheme.primary
+                    } else {
+                        Color.Transparent
+                    }
+
+                    // Animate segment color for smooth transition (instant snap if active)
+                    val animatedSegmentColor by animateColorAsState(
+                        targetValue = segmentColor,
+                        animationSpec = if (isInProgress) snap() else tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+                        label = "segmentColorAnimation"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(animatedSegmentColor)
+                            .then(
+                                if (isInProgress) {
+                                    Modifier.border(
+                                        width = 1.dp,
+                                        color = borderColor.copy(alpha = 0.8f),
+                                        shape = RoundedCornerShape(4.dp)
+                                    )
+                                } else Modifier
+                            )
+                    )
+                }
+            }
         }
 
         // Workout navigation controls rows
@@ -2704,9 +3023,14 @@ fun TrackingHudView(
                 modifier = Modifier
                     .size(54.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF331114))
+                    .background(if (isLightMode) MaterialTheme.colorScheme.errorContainer else Color(0xFF331114))
             ) {
-                Icon(imageVector = Icons.Default.Stop, contentDescription = "stop workout", tint = LaserCrimson, modifier = Modifier.size(24.dp))
+                Icon(
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = "stop workout",
+                    tint = if (isLightMode) MaterialTheme.colorScheme.error else LaserCrimson,
+                    modifier = Modifier.size(24.dp)
+                )
             }
 
             // PRIMARY PLAY PAUSE ROTATING BUTTON
@@ -2739,9 +3063,14 @@ fun TrackingHudView(
                 modifier = Modifier
                     .size(54.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF16252C))
+                    .background(if (isLightMode) MaterialTheme.colorScheme.secondaryContainer else Color(0xFF16252C))
             ) {
-                Icon(imageVector = Icons.Default.SkipNext, contentDescription = "skip interval", tint = RecoveryTeal, modifier = Modifier.size(24.dp))
+                Icon(
+                    imageVector = Icons.Default.SkipNext,
+                    contentDescription = "skip interval",
+                    tint = if (isLightMode) MaterialTheme.colorScheme.secondary else RecoveryTeal,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }

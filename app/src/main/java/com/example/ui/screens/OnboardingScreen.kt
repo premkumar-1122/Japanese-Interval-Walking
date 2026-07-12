@@ -60,10 +60,11 @@ fun OnboardingScreen(
 
     // Saved weight if any to prefill
     val savedWeight by viewModel.onboardingWeight.collectAsStateWithLifecycle()
+    val weeklyGoal by viewModel.weeklyWalkGoal.collectAsStateWithLifecycle()
 
     // Slide steps tracking
     var currentStep by rememberSaveable { mutableStateOf(0) }
-    val totalSteps = 7 // 0 = Welcome, 1 = Steps, 2 = Insights, 3 = Calorie, 4 = Weight, 5 = Permission, 6 = Ready
+    val totalSteps = 8 // 0 = Welcome, 1 = Steps, 2 = Insights, 3 = Calorie, 4 = Weight, 5 = Weekly Goal, 6 = Permission, 7 = Ready
 
     // Trigger starting analytics once
     LaunchedEffect(Unit) {
@@ -216,7 +217,11 @@ fun OnboardingScreen(
                                 viewModel.setOnboardingWeight(weight)
                             }
                         )
-                        5 -> PermissionsSlide(
+                        5 -> WeeklyGoalCollectionSlide(
+                            isJp = isJp,
+                            viewModel = viewModel
+                        )
+                        6 -> PermissionsSlide(
                             isJp = isJp,
                             viewModel = viewModel,
                             hasActivity = hasActivityPermission,
@@ -240,7 +245,7 @@ fun OnboardingScreen(
                                 viewModel.healthConnectPermissionManager.launchPermissionRequestSafely(hcPermissionLauncher)
                             }
                         )
-                        6 -> CompletionReadySlide(isJp, savedWeight, hasActivityPermission, hasHcPermission)
+                        7 -> CompletionReadySlide(isJp, savedWeight, hasActivityPermission, hasHcPermission, weeklyGoal)
                     }
                 }
             }
@@ -1164,6 +1169,126 @@ fun PermissionStatusRow(
 }
 
 // ==========================================
+// SCREEN 6: WEEKLY GOAL SELECTOR SLIDE
+// ==========================================
+@Composable
+fun WeeklyGoalCollectionSlide(
+    isJp: Boolean,
+    viewModel: WalkingViewModel
+) {
+    val weeklyGoal by viewModel.weeklyWalkGoal.collectAsStateWithLifecycle()
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Icon(
+            imageVector = Icons.Default.DateRange,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(56.dp)
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = if (isJp) "週間目標の設定" else "Weekly Walking Goal",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Black,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = if (isJp) {
+                "一週間に何回インターバル速歩を行うか設定します（月曜日〜日曜日）。最初は週に5回を目安にするのがおすすめです！"
+            } else {
+                "Select how many walks per week you want to do (Monday to Sunday). We recommend starting with 5 walks/week to build a healthy scientific habit."
+            },
+            fontSize = 12.sp,
+            color = TextMutedGrey,
+            textAlign = TextAlign.Center,
+            lineHeight = 17.sp
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Minus button
+            IconButton(
+                onClick = {
+                    if (weeklyGoal > 1) {
+                        viewModel.setWeeklyWalkGoal(weeklyGoal - 1)
+                    }
+                },
+                enabled = weeklyGoal > 1,
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        if (weeklyGoal > 1) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Remove,
+                    contentDescription = "decrease goal",
+                    tint = if (weeklyGoal > 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(32.dp))
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "$weeklyGoal",
+                    fontSize = 48.sp,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = if (isJp) "回 / 週" else "walks / week",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMutedGrey
+                )
+            }
+
+            Spacer(modifier = Modifier.width(32.dp))
+
+            // Plus button
+            IconButton(
+                onClick = {
+                    if (weeklyGoal < 7) {
+                        viewModel.setWeeklyWalkGoal(weeklyGoal + 1)
+                    }
+                },
+                enabled = weeklyGoal < 7,
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        if (weeklyGoal < 7) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        CircleShape
+                    )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "increase goal",
+                    tint = if (weeklyGoal < 7) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                )
+            }
+        }
+    }
+}
+
+// ==========================================
 // SCREEN 7: COMPLETION READY SLIDE
 // ==========================================
 @Composable
@@ -1171,7 +1296,8 @@ fun CompletionReadySlide(
     isJp: Boolean,
     savedWeight: Float?,
     hasActivity: Boolean,
-    hasHc: Boolean
+    hasHc: Boolean,
+    weeklyGoal: Int
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1291,6 +1417,17 @@ fun CompletionReadySlide(
                         } else {
                             if (isJp) "他の健康アプリとの連携: 未接続 (後で追加できます)" else "Other health apps: Skip for now"
                         },
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Item 4: Weekly Walk Goal Summary
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Check, contentDescription = null, tint = Color.Green, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = if (isJp) "週間ウォーキング目標: 週に ${weeklyGoal} 回の速歩" else "Weekly walking goal: $weeklyGoal walks / week",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )

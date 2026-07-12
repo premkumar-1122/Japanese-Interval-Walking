@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag Name (e.g. v1.0.0)'
+        description: 'Release Tag Name (e.g. v1.0.1)'
         required: true
-        default: 'v1.0.0'
+        default: 'v1.0.1'
 
 permissions:
   contents: write
@@ -30,28 +30,54 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Build Debug APK
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/my-upload-key.jks
+
+      - name: Build Release APK
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug
+          ./gradlew :app:assembleRelease
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
-      - name: Generate Changelog
-        id: changelog
+      - name: Build Release AAB
         run: |
-          # Fetch all tags so git describe works correctly
-          git fetch --tags --force
-          
-          # Set the tag name based on the event trigger
+          ./gradlew :app:bundleRelease
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Rename Artifacts
+        run: |
+          # Set tag name based on event trigger
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG_NAME="${{ github.event.inputs.tag_name }}"
           else
             TAG_NAME="${{ github.ref_name }}"
           fi
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
-          
+
+          # Rename APK and AAB with version in filename
+          mv app/build/outputs/apk/release/app-release.apk \
+             app/build/outputs/apk/release/japanese-interval-walking-${TAG_NAME}.apk
+          mv app/build/outputs/bundle/release/app-release.aab \
+             app/build/outputs/bundle/release/japanese-interval-walking-${TAG_NAME}.aab
+
+      - name: Generate Changelog
+        id: changelog
+        run: |
+          # Fetch all tags so git describe works correctly
+          git fetch --tags --force
+
           # Determine the previous tag to get commit history in between
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
-          
+
           echo "### Changelog (Recent commits)" > release_notes.md
           if [ -z "$PREV_TAG" ]; then
             echo "First release. Commits list:" >> release_notes.md
@@ -73,6 +99,7 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/apk/release/japanese-interval-walking-${{ env.TAG_NAME }}.apk
+            app/build/outputs/bundle/release/japanese-interval-walking-${{ env.TAG_NAME }}.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

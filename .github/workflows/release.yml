@@ -81,16 +81,31 @@ jobs:
 
           # Determine the previous tag to get commit history in between
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          if [ -z "$PREV_TAG" ]; then RANGE="HEAD"; else RANGE="${PREV_TAG}..HEAD"; fi
 
-          echo "### Changelog (Recent commits)" > release_notes.md
-          if [ -z "$PREV_TAG" ]; then
-            echo "First release. Commits list:" >> release_notes.md
-            git log -n 15 --pretty=format:"* %s (%h)" >> release_notes.md
-          else
-            echo "Changes since last release ($PREV_TAG):" >> release_notes.md
-            git log ${PREV_TAG}..HEAD --pretty=format:"* %s (%h)" >> release_notes.md
-          fi
-          echo -e "\n" >> release_notes.md
+          {
+            echo "# Japanese Interval Walking — ${TAG_NAME}"
+            echo ""
+            echo "### 🚀 Features & Improvements"
+            feat=$(git log $RANGE --pretty=format:"%s" | grep -iE '^(feat|feature)' || true)
+            if [ -n "$feat" ]; then echo "$feat" | sed -E 's/^(feat(\([^)]*\))?:\s*|feature:\s*)//I' | sed 's/^/* /'; else echo "* (none)"; fi
+            echo ""
+            echo "### 🛠️ Bug Fixes"
+            fix=$(git log $RANGE --pretty=format:"%s" | grep -iE '^(fix|bugfix|hotfix)' || true)
+            if [ -n "$fix" ]; then echo "$fix" | sed -E 's/^(fix(\([^)]*\))?:\s*|bugfix:\s*|hotfix:\s*)//I' | sed 's/^/* /'; else echo "* (none)"; fi
+            echo ""
+            echo "### 🧹 Chores & Maintenance"
+            chore=$(git log $RANGE --pretty=format:"%s" | grep -iE '^(chore|refactor|docs|style|test|perf|build|ci)' || true)
+            if [ -n "$chore" ]; then echo "$chore" | sed -E 's/^[a-z]+(\([^)]*\))?:\s*//I' | sed 's/^/* /'; else echo "* (none)"; fi
+            echo ""
+            echo "### 📝 Other"
+            other=$(git log $RANGE --pretty=format:"%s" | grep -ivE '^(feat|feature|fix|bugfix|hotfix|chore|refactor|docs|style|test|perf|build|ci)' || true)
+            if [ -n "$other" ]; then echo "$other" | sed 's/^/* /'; else echo "* (none)"; fi
+            echo ""
+            echo "### 📦 Assets"
+            echo "* \`japanese-interval-walking-${TAG_NAME}.apk\` — installable release APK"
+            echo "* \`japanese-interval-walking-${TAG_NAME}.aab\` — Android App Bundle (Play Store)"
+          } > release_notes.md
         shell: bash
 
       - name: Create GitHub Release

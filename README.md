@@ -4,6 +4,19 @@ An advanced, premium scientific fitness tracker designed to help users execute �
 
 ---
 
+## 🛠️ Releasing & CI/CD
+
+Releases are produced by the tag-triggered GitHub Actions workflow (`.github/workflows/release.yml`).
+Cutting a release, required secrets, and the agent runbook live in:
+
+- **[SKILL.md](./SKILL.md)** — step-by-step runbook for creating a release (agents/maintainers).
+- **[docs/CI-CD.md](./docs/CI-CD.md)** — pipeline overview, triggers, and required secrets.
+
+To ship a new version: bump `versionCode`/`versionName` in `app/build.gradle.kts`, push `main`,
+then push a `vX.Y.Z` tag. CI builds the signed APK + AAB and publishes the GitHub release automatically.
+
+---
+
 ## 🚀 Release v1.0.2 (Feature Release)
 
 This release introduces a fully-featured onboarding flow with Jetpack DataStore persistence, segmented workout cycle tracking, and light mode visual enhancements.

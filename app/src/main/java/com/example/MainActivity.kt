@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2026 Prem Kumar Gara
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
 package com.example
 
 import android.os.Bundle
@@ -37,8 +53,15 @@ class MainActivity : ComponentActivity() {
         )[WalkingViewModel::class.java]
 
         setContent {
-            val isDarkTheme by viewModel.isDarkTheme.collectAsStateWithLifecycle()
+            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val isOnboardingCompleted by viewModel.isOnboardingCompleted.collectAsStateWithLifecycle()
+
+            val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val isDarkTheme = when(themeMode) {
+                1 -> false
+                2 -> true
+                else -> isSystemDark
+            }
 
             MyApplicationTheme(darkTheme = isDarkTheme) {
                 Surface(
@@ -57,7 +80,6 @@ class MainActivity : ComponentActivity() {
                         DashboardScreen(
                             viewModel = viewModel,
                             isDarkTheme = isDarkTheme,
-                            onThemeToggle = { viewModel.toggleTheme() },
                             modifier = Modifier.fillMaxSize()
                         )
                     }

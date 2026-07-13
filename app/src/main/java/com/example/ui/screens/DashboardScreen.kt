@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.ui.theme.Corners
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -49,14 +50,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.WalkingSession
 import com.example.service.WalkingForegroundService
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.draw.shadow
 import com.example.ui.WalkingViewModel
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 import com.example.data.JIWConfig
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val TextMutedGrey: Color
     @Composable
@@ -93,11 +97,13 @@ private fun hasRequiredPermissions(context: Context): Boolean {
 fun DashboardScreen(
     viewModel: WalkingViewModel,
     isDarkTheme: Boolean,
-    onThemeToggle: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val isJp by viewModel.isJpLanguage.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var wasDonationLaunched by remember { mutableStateOf(false) }
 
     // Observe lifecycle ON_RESUME to dynamically recheck Health Connect status/permissions
     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
@@ -106,6 +112,12 @@ fun DashboardScreen(
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 viewModel.checkHealthConnectPermissions()
                 viewModel.refreshSyncMetadata()
+                if (wasDonationLaunched) {
+                    wasDonationLaunched = false
+                    scope.launch {
+                        snackbarHostState.showSnackbar(if (isJp) "JIW Trackerを応援いただきありがとうございます！ \uD83D\uDC9B" else "Thank you for supporting JIW Tracker! \uD83D\uDC9B")
+                    }
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -116,6 +128,13 @@ fun DashboardScreen(
     
     // UI tabs state
     var selectedTab by remember { mutableStateOf(0) }
+    // Remembers the tab active before entering Settings so Back can restore it
+    var previousTab by remember { mutableStateOf(0) }
+
+    // Back handler: while on Settings (tab 3), system back returns to the prior tab instead of exiting
+    BackHandler(enabled = selectedTab == 3) {
+        selectedTab = previousTab
+    }
     
     // Core states collected from flow
     val currentServiceState by viewModel.serviceState.collectAsStateWithLifecycle()
@@ -154,31 +173,34 @@ fun DashboardScreen(
         list.toTypedArray()
     }
 
+    var showAboutScreen by remember { mutableStateOf(false) }
+
+    if (showAboutScreen) {
+        AboutScreen(
+            isJp = isJp,
+            onNavigateBack = { showAboutScreen = false }
+        )
+        return
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             val completedData by WalkingForegroundService.completedSession.collectAsStateWithLifecycle()
             if (!isTrackingActive && completedData == null) {
                 TopAppBar(
                     title = {
-                        Column(modifier = Modifier.padding(start = 4.dp)) {
-                            Text(
-                                text = if (isJp) "インターバル歩行セッション" else "INTERVAL SESSION",
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 10.sp,
-                                letterSpacing = 2.sp,
-                                modifier = Modifier.padding(bottom = 2.dp)
-                            )
-                            val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
-                            Text(
-                                text = if (isJp) "JIWトラッカー" else "JIW Tracker",
-                                fontWeight = FontWeight.Black,
-                                fontStyle = if (isLightMode) FontStyle.Italic else FontStyle.Normal,
-                                color = if (isLightMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground,
-                                fontSize = 21.sp,
-                                letterSpacing = (-0.5).sp
-                            )
-                        }
+                        val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
+                        Text(
+                            text = if (isJp) "JIWトラッカー" else "JIW Tracker",
+                            fontWeight = FontWeight.Black,
+                            fontStyle = FontStyle.Italic,
+                            color = if (isLightMode) Color(0xFF111111) else MaterialTheme.colorScheme.onBackground,
+                            fontSize = 21.sp,
+                            letterSpacing = (-0.5).sp,
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                        )
                     },
                     actions = {
                         Row(
@@ -202,18 +224,27 @@ fun DashboardScreen(
                                 )
                             }
                             
-                            // Eco battery Light/Dark theme toggle styling
+                            // Settings / Home toggle button
                             IconButton(
-                                onClick = onThemeToggle,
+                                onClick = {
+                                    if (selectedTab == 3) {
+                                        // Already on Settings — go back to previous tab
+                                        selectedTab = previousTab
+                                    } else {
+                                        // Store current tab then open Settings
+                                        previousTab = selectedTab
+                                        selectedTab = 3
+                                    }
+                                },
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
                             ) {
                                 Icon(
-                                    imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                    contentDescription = "Toggle Theme",
-                                    tint = if (isDarkTheme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                    imageVector = if (selectedTab == 3) Icons.Default.Home else Icons.Default.Settings,
+                                    contentDescription = if (selectedTab == 3) "Go to Home" else "Settings",
+                                    tint = MaterialTheme.colorScheme.onBackground,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -227,66 +258,85 @@ fun DashboardScreen(
         },
         bottomBar = {
             val completedData by WalkingForegroundService.completedSession.collectAsStateWithLifecycle()
-            if (!isTrackingActive && completedData == null) {
+            // Hide bottom nav on Settings (tab 3) and during active tracking / completion screens
+            if (!isTrackingActive && completedData == null && selectedTab != 3) {
                 val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
-                val navBgColor = if (isLightMode) Color(0xFFEDF3E7) else MaterialTheme.colorScheme.surface
                 val activePillColor = if (isLightMode) Color(0xFF5FAF35) else MaterialTheme.colorScheme.primary
                 val activeContentColor = if (isLightMode) Color(0xFF111111) else Color.Black
-                val inactiveColor = if (isLightMode) Color(0xFF7A7A7A) else Color(0xFFA3A3A3)
+                val inactiveColor = Color(0xFFA0A0A0)
+                // Subtle translucent greyish-green pill outline
+                val pillOutlineColor = Color(0xFF3A4A3A).copy(alpha = 0.5f)
 
-                NavigationBar(
-                    containerColor = navBgColor,
-                    tonalElevation = 12.dp,
-                    windowInsets = WindowInsets.navigationBars,
-                    modifier = Modifier.fillMaxWidth()
+                val items = listOf(
+                    Triple(if (isJp) "トレーニング" else "TRAIN", Icons.AutoMirrored.Filled.DirectionsWalk, 0),
+                    Triple(if (isJp) "データ履歴" else "DASHBOARD", Icons.Default.Analytics, 1),
+                    Triple(if (isJp) "テクニック" else "GUIDE", Icons.AutoMirrored.Filled.MenuBook, 2)
+                )
+
+                // Outer transparent host — provides bottom spacing and horizontal margins
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    val items = listOf(
-                        Triple(
-                            if (isJp) "トレーニング" else "TRAIN", 
-                            Icons.AutoMirrored.Filled.DirectionsWalk, 
-                            0
-                        ),
-                        Triple(
-                            if (isJp) "データ履歴" else "DASHBOARD", 
-                            Icons.Default.Analytics, 
-                            1
-                        ),
-                        Triple(
-                            if (isJp) "テクニック" else "GUIDE", 
-                            Icons.AutoMirrored.Filled.MenuBook, 
-                            2
-                        ),
-                        Triple(
-                            if (isJp) "ギア設定" else "SETTINGS", 
-                            Icons.Default.Settings, 
-                            3
-                        )
-                    )
-                    // Wait, let's keep the exact same item tuples as they were to maintain functionality!
-
-                    
-                    items.forEach { (label, icon, index) ->
-                        NavigationBarItem(
-                            selected = selectedTab == index,
-                            onClick = { selectedTab = index },
-                            icon = { Icon(imageVector = icon, contentDescription = label, modifier = Modifier.size(20.dp)) },
-                            label = { 
-                                Text(
-                                    text = label, 
-                                    fontSize = 9.sp, 
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                ) 
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = activeContentColor,
-                                selectedTextColor = if (isLightMode) Color(0xFF111111) else MaterialTheme.colorScheme.primary,
-                                indicatorColor = activePillColor,
-                                unselectedIconColor = inactiveColor,
-                                unselectedTextColor = inactiveColor
+                    // Pitch-black floating pill container
+                    Row(
+                        modifier = Modifier
+                            .shadow(
+                                elevation = 10.dp,
+                                shape = RoundedCornerShape(50.dp),
+                                ambientColor = Color(0xFF2AFF6A).copy(alpha = 0.15f),
+                                spotColor = Color(0xFF2AFF6A).copy(alpha = 0.10f)
                             )
-                        )
+                            .clip(RoundedCornerShape(50.dp))
+                            .background(Color.Black)
+                            .border(1.dp, pillOutlineColor, RoundedCornerShape(50.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        items.forEach { (label, icon, index) ->
+                            val selected = selectedTab == index
+                            val targetWidth = if (selected) 130.dp else 50.dp
+                            val width by androidx.compose.animation.core.animateDpAsState(
+                                targetValue = targetWidth,
+                                label = "navWidth"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .height(50.dp)
+                                    .width(width)
+                                    .clip(CircleShape)
+                                    .background(if (selected) activePillColor else Color.Transparent)
+                                    .clickable { selectedTab = index },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = label,
+                                        tint = if (selected) activeContentColor else inactiveColor,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    androidx.compose.animation.AnimatedVisibility(visible = selected) {
+                                        Text(
+                                            text = label,
+                                            color = activeContentColor,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            modifier = Modifier.padding(start = 8.dp),
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -331,7 +381,8 @@ fun DashboardScreen(
                         viewModel = viewModel,
                         isJp = isJp,
                         onConnectHc = onConnectHealthConnect,
-                        onNavigateToDashboard = { selectedTab = 1 }
+                        onNavigateToDashboard = { selectedTab = 1 },
+                        onNavigateToAbout = { showAboutScreen = true }
                     )
                 }
             }
@@ -481,7 +532,7 @@ fun TrainTabScreen(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color.Black
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = Corners.card,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp)
@@ -512,7 +563,7 @@ fun TrainTabScreen(
                     width = if (isSelected) 2.dp else 1.dp,
                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = Corners.card,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -671,7 +722,7 @@ fun DashboardStatsTabScreen(
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(24.dp),
+                shape = Corners.card,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -749,45 +800,50 @@ fun DashboardStatsTabScreen(
             }
         }
 
-        // Giant stats strip (Nike Run style)
+        // Giant stats strip (Nike Run style) — wrapped in card matching Weekly Sessions Goal style
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = Corners.card,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(
-                        valueFormatted(totalSessions.toDouble(), 0), 
-                        fontWeight = FontWeight.Black, 
-                        fontStyle = FontStyle.Italic,
-                        color = MaterialTheme.colorScheme.primary, 
-                        fontSize = 32.sp
-                    )
-                    Text(if (isJp) "セッション" else "SESSIONS", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextMutedGrey)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(
-                        valueFormatted(totalMinutes.toDouble(), 0), 
-                        fontWeight = FontWeight.Black, 
-                        fontStyle = FontStyle.Italic,
-                        color = TextOnObsidian, 
-                        fontSize = 32.sp
-                    )
-                    Text(if (isJp) "合計分" else "TOTAL MINUTES", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextMutedGrey)
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(
-                        valueFormatted(totalBurn, 0), 
-                        fontWeight = FontWeight.Black, 
-                        fontStyle = FontStyle.Italic,
-                        color = LaserCrimson, 
-                        fontSize = 32.sp
-                    )
-                    Text("TOTAL KCAL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextMutedGrey)
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(
+                                valueFormatted(totalSessions.toDouble(), 0),
+                                fontWeight = FontWeight.Black,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 32.sp
+                            )
+                            Text(if (isJp) "セッション" else "SESSIONS", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextMutedGrey)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(
+                                valueFormatted(totalMinutes.toDouble(), 0),
+                                fontWeight = FontWeight.Black,
+                                fontStyle = FontStyle.Italic,
+                                color = TextOnObsidian,
+                                fontSize = 32.sp
+                            )
+                            Text(if (isJp) "合計分" else "TOTAL MINUTES", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextMutedGrey)
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            Text(
+                                valueFormatted(totalBurn, 0),
+                                fontWeight = FontWeight.Black,
+                                fontStyle = FontStyle.Italic,
+                                color = LaserCrimson,
+                                fontSize = 32.sp
+                            )
+                            Text("TOTAL KCAL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = TextMutedGrey)
+                        }
+                    }
                 }
             }
         }
@@ -800,7 +856,7 @@ fun DashboardStatsTabScreen(
 
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(24.dp),
+                shape = Corners.card,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -905,12 +961,12 @@ fun DashboardStatsTabScreen(
 
                     if (isAvailable) {
                         // Display Sync Statistics if connected
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                        shape = Corners.card,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
                                     text = if (isJp) "最終同期実績" else "LAST SYNCDATA STATUS",
@@ -966,7 +1022,7 @@ fun DashboardStatsTabScreen(
                                     containerColor = MaterialTheme.colorScheme.secondary,
                                     contentColor = MaterialTheme.colorScheme.onSecondary
                                 ),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = Corners.card,
                                 modifier = Modifier.fillMaxWidth().height(48.dp)
                             ) {
                                 Row(
@@ -997,7 +1053,7 @@ fun DashboardStatsTabScreen(
                                     containerColor = MaterialTheme.colorScheme.secondary,
                                     contentColor = MaterialTheme.colorScheme.onSecondary
                                 ),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = Corners.card,
                                 modifier = Modifier.fillMaxWidth().height(48.dp)
                             ) {
                                 Row(
@@ -1032,7 +1088,7 @@ fun DashboardStatsTabScreen(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = Corners.card,
                             modifier = Modifier.fillMaxWidth().height(48.dp)
                         ) {
                             Row(
@@ -1289,7 +1345,7 @@ fun HistoryRowCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = Corners.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1547,7 +1603,7 @@ fun TechniqueTabScreen(isJp: Boolean) {
                 colors = CardDefaults.cardColors(
                     containerColor = if (isLightMode) Color(0xFFFFFFFF) else MaterialTheme.colorScheme.surfaceVariant
                 ),
-                shape = RoundedCornerShape(12.dp),
+                shape = Corners.card,
                 border = BorderStroke(1.dp, borderColor),
                 elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
                 modifier = Modifier.fillMaxWidth()
@@ -1629,7 +1685,8 @@ fun SettingsTabScreen(
     viewModel: WalkingViewModel,
     isJp: Boolean,
     onConnectHc: () -> Unit,
-    onNavigateToDashboard: () -> Unit
+    onNavigateToDashboard: () -> Unit,
+    onNavigateToAbout: () -> Unit
 ) {
     val context = LocalContext.current
     
@@ -1687,6 +1744,76 @@ fun SettingsTabScreen(
             )
         }
 
+        // Theme Selector
+        item {
+            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = Corners.card,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Text(
+                        if (isJp) "テーマ設定" else "App Theme",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        letterSpacing = 0.5.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val options = listOf(
+                            Triple(0, if (isJp) "システム" else "System", Icons.Default.BrightnessAuto),
+                            Triple(1, if (isJp) "ライト" else "Light", Icons.Default.LightMode),
+                            Triple(2, if (isJp) "ダーク" else "Dark", Icons.Default.DarkMode)
+                        )
+                        options.forEach { (mode, label, icon) ->
+                            val selected = themeMode == mode
+                            val bg = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
+                            val contentColor = if (selected) Color.Black else MaterialTheme.colorScheme.onSurface
+                            
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(bg)
+                                    .clickable { viewModel.setThemeMode(mode) }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = label,
+                                        tint = contentColor,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = contentColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Custom Interval Durations
         item {
             IntervalSettingsCard(
@@ -1733,12 +1860,12 @@ fun SettingsTabScreen(
 
             val isLightMode = MaterialTheme.colorScheme.background != Color(0xFF0F0F0F)
 
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = Corners.card,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1857,7 +1984,7 @@ fun SettingsTabScreen(
                                             android.util.Log.e("Settings", "Failed opening Play Store help link", e)
                                         }
                                     },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = Corners.card,
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
@@ -1898,7 +2025,7 @@ fun SettingsTabScreen(
                                         android.util.Log.d("HealthConnect", "Dashboard settings MANAGE PERMISSIONS button clicked")
                                         onConnectHc()
                                     },
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = Corners.card,
                                     modifier = Modifier.fillMaxWidth().height(48.dp),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.secondary,
@@ -1955,12 +2082,12 @@ fun SettingsTabScreen(
 
         // Vocal TTS Coaches toggles Screen
         item {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                modifier = Modifier.fillMaxWidth()
-            ) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = Corners.card,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth()
+    ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
                         text = if (isJp) "音声案内コーチ" else "Sounds & Voice",
@@ -2000,6 +2127,11 @@ fun SettingsTabScreen(
             )
         }
 
+        // Donation and Support Options
+        item {
+            DonationRowCard(isJp = isJp, onClick = { onNavigateToAbout() })
+        }
+
         // Risk Data Operations Box
         item {
             DangerZoneCard(
@@ -2032,7 +2164,7 @@ fun SettingsTabScreen(
                         value = weightStr.value,
                         onValueChange = { weightStr.value = it },
                         label = { Text(if (isJp) (if (isWeightUnitKg) "体重 (kg)" else "体重 (lb)") else (if (isWeightUnitKg) "Weight (kg)" else "Weight (lb)")) },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = Corners.card,
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MaterialTheme.colorScheme.primary,
@@ -2226,7 +2358,7 @@ fun IntervalSettingsCard(customSlow: Int, customFast: Int, customCycles: Int, is
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = Corners.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -2242,7 +2374,7 @@ fun IntervalSettingsCard(customSlow: Int, customFast: Int, customCycles: Int, is
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        if (isJp) "カスタム間歩の時間設定" else "Your Interval Settings",
+                        if (isJp) "カスタム間歩の設定" else "Set Custom Interval",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.primary,
@@ -2274,11 +2406,26 @@ fun PerformanceWeightCard(
     } else {
         String.format(Locale.US, "%.1f lb", weight * 2.20462f)
     }
+    
+    var showInfoDialog by remember { mutableStateOf(false) }
+
+    if (showInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showInfoDialog = false },
+            title = { Text(if (isJp) "体重が必要な理由" else "Why we need your weight") },
+            text = { Text(if (isJp) "あなたの体重は、消費カロリーをより正確に計算するために役立ちます。" else "Your weight helps us calculate calories burned more accurately.") },
+            confirmButton = {
+                TextButton(onClick = { showInfoDialog = false }) {
+                    Text("OK", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        )
+    }
 
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = Corners.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -2293,17 +2440,28 @@ fun PerformanceWeightCard(
                 Icon(imageVector = Icons.Default.Scale, contentDescription = "weight setting", tint = MaterialTheme.colorScheme.secondary)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (isJp) "体重の設定 : $displayWeight" else "Set Your Weight : $displayWeight",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.secondary,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "weight info",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .size(14.dp)
+                                .clickable { showInfoDialog = true }
+                        )
+                    }
                     Text(
-                        if (isJp) "消費カロリー調整プロファイル" else "CALORIES & WEIGHT",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.secondary,
-                        letterSpacing = 0.5.sp
-                    )
-                    Text(
-                        if (isJp) "あなたの体重 : $displayWeight" else "Your weight: $displayWeight",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
+                        if (isJp) "消費カロリー調整プロファイル" else "Calculates calories burned more accurately",
+                        fontSize = 10.sp,
+                        color = TextMutedGrey,
                         modifier = Modifier.padding(top = 2.dp)
                     )
                     
@@ -2353,7 +2511,7 @@ fun WeeklyGoalSettingsCard(goal: Int, isJp: Boolean, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = Corners.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -2396,7 +2554,7 @@ fun OnboardingSettingsCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = Corners.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -2433,7 +2591,7 @@ fun OnboardingSettingsCard(
             ) {
                 Button(
                     onClick = onReplay,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = Corners.card,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary
@@ -2459,7 +2617,7 @@ fun OnboardingSettingsCard(
 
                 Button(
                     onClick = onReset,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = Corners.card,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer
@@ -2498,7 +2656,7 @@ fun WorkoutReminderSettingCard(
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp),
+        shape = Corners.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -2592,7 +2750,7 @@ fun DangerZoneCard(isJp: Boolean, onClearAll: () -> Unit) {
 
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(12.dp),
+        shape = Corners.card,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -2622,7 +2780,7 @@ fun DangerZoneCard(isJp: Boolean, onClearAll: () -> Unit) {
                     contentColor = MaterialTheme.colorScheme.error
                 ),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(8.dp),
+                shape = Corners.card,
                 modifier = Modifier.align(Alignment.Start)
             ) {
                 Text(
@@ -2823,7 +2981,7 @@ fun TrackingHudView(
                     .border(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                        shape = RoundedCornerShape(20.dp)
+                        shape = Corners.card
                     )
                     .padding(horizontal = 12.dp, vertical = 6.dp)
             ) {
@@ -2845,12 +3003,12 @@ fun TrackingHudView(
         }
 
         // Running statistics telemetry
-        Card(
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = Corners.card,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth()
+    ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = actionHintText,
@@ -3200,7 +3358,7 @@ fun SessionCompletionScreen(
         // Main modern report layout in a beautiful card
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(20.dp),
+            shape = Corners.card,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -3358,7 +3516,7 @@ fun SessionCompletionScreen(
         // Go to dashboard CTA Button
         Button(
             onClick = onGoToDashboard,
-            shape = RoundedCornerShape(12.dp),
+            shape = Corners.card,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             modifier = Modifier
                 .fillMaxWidth()
@@ -3429,6 +3587,43 @@ fun CompletionMetricItem(
                     modifier = Modifier.padding(bottom = 2.dp, start = 2.dp)
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun DonationRowCard(isJp: Boolean, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = Corners.card,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Favorite,
+                    contentDescription = "Support",
+                    tint = Color(0xFFE91E63),
+                    modifier = Modifier.size(24.dp).padding(end = 12.dp)
+                )
+                Text(
+                    text = if (isJp) "アプリについて" else "About",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.OpenInNew,
+                contentDescription = "Open",
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }

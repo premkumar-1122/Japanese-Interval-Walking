@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import com.example.ui.theme.Corners
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -332,7 +333,7 @@ fun OnboardingNavigationRow(
                 // Continue / Finish Button
                 Button(
                     onClick = onContinue,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = Corners.card,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = Color.Black
@@ -582,7 +583,7 @@ fun StepTrackingSlide(isJp: Boolean) {
 
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(12.dp),
+            shape = Corners.card,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -692,7 +693,7 @@ fun WalkingInsightsSlide(isJp: Boolean) {
                 Card(
                     modifier = Modifier.weight(1f),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(8.dp),
+                    shape = Corners.card,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                 ) {
                     Column(
@@ -768,7 +769,7 @@ fun CaloriesSlide(isJp: Boolean) {
 
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(12.dp),
+            shape = Corners.card,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -901,7 +902,7 @@ fun WeightCollectionSlide(
             label = { Text(if (isJp) "体重 (kg)" else "Body Weight (kg)") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            shape = RoundedCornerShape(12.dp),
+            shape = Corners.card,
             isError = isError,
             placeholder = { Text("70.0") },
             colors = OutlinedTextFieldDefaults.colors(
@@ -1053,7 +1054,7 @@ fun PermissionsSlide(
         if (!hasActivity) {
             Button(
                 onClick = onRequest,
-                shape = RoundedCornerShape(8.dp),
+                shape = Corners.card,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1068,7 +1069,7 @@ fun PermissionsSlide(
             Card(
                 colors = CardDefaults.cardColors(containerColor = SystemSuccess.copy(alpha = 0.12f)),
                 border = BorderStroke(1.dp, SystemSuccess.copy(alpha = 0.25f)),
-                shape = RoundedCornerShape(12.dp),
+                shape = Corners.card,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
@@ -1112,7 +1113,7 @@ fun PermissionStatusRow(
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         border = BorderStroke(1.dp, if (granted) SystemSuccess.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outline),
-        shape = RoundedCornerShape(10.dp),
+        shape = Corners.card,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -1145,7 +1146,7 @@ fun PermissionStatusRow(
                 if (showConnectButton) {
                     Button(
                         onClick = onConnectClick,
-                        shape = RoundedCornerShape(6.dp),
+                        shape = Corners.card,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondary,
@@ -1356,7 +1357,7 @@ fun CompletionReadySlide(
         // High fidelity summary card with ticks
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-            shape = RoundedCornerShape(12.dp),
+            shape = Corners.card,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
             modifier = Modifier.fillMaxWidth()
         ) {

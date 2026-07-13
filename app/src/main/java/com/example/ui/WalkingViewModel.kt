@@ -135,8 +135,17 @@ class WalkingViewModel(
     private val _isAudioEnabled = MutableStateFlow(sharedPrefs.getBoolean("pref_is_audio_enabled", true))
     val isAudioEnabled: StateFlow<Boolean> = _isAudioEnabled.asStateFlow()
 
-    private val _isDarkTheme = MutableStateFlow(sharedPrefs.getBoolean("pref_is_dark_theme", true))
-    val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
+    // 0 = System, 1 = Light, 2 = Dark
+    private val _themeMode = MutableStateFlow(
+        if (sharedPrefs.contains("pref_is_dark_theme")) {
+            val wasDark = sharedPrefs.getBoolean("pref_is_dark_theme", true)
+            sharedPrefs.edit().remove("pref_is_dark_theme").putInt("pref_theme_mode", if (wasDark) 2 else 1).apply()
+            if (wasDark) 2 else 1
+        } else {
+            sharedPrefs.getInt("pref_theme_mode", 0)
+        }
+    )
+    val themeMode: StateFlow<Int> = _themeMode.asStateFlow()
 
     private val _isGoogleFitConnected = MutableStateFlow(sharedPrefs.getBoolean("pref_gf_connected", false))
     val isGoogleFitConnected: StateFlow<Boolean> = _isGoogleFitConnected.asStateFlow()
@@ -316,10 +325,9 @@ class WalkingViewModel(
     }
 
     // Preference adjust controllers
-    fun toggleTheme() {
-        val nextMode = !_isDarkTheme.value
-        _isDarkTheme.value = nextMode
-        sharedPrefs.edit().putBoolean("pref_is_dark_theme", nextMode).apply()
+    fun setThemeMode(mode: Int) {
+        _themeMode.value = mode
+        sharedPrefs.edit().putInt("pref_theme_mode", mode).apply()
     }
 
     fun toggleWeightUnit() {

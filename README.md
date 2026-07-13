@@ -1,7 +1,3 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
-
 # JIW Tracker (Japanese Interval Walking Tracker)
 
 An advanced, premium scientific fitness tracker designed to help users execute 信州大学 (Shinshu University) style Interval Walking. The app manages and schedules interval profiles, calculates precise metabolic calorie burns based on walking speeds (easy stroll vs. brisk walk) and body metrics, and syncs seamlessly with Android Health Connect.
@@ -47,21 +43,3 @@ This release implements targeted UX bug fixes to improve navigation flow, reduce
    - `CUSTOM INTERVAL DEFINITION` → `Your Interval Settings`
    - `Weight calibration` → `Weight settings`
 4. **Weight Unit Toggle Support:** Added an interactive `kg` / `lb` segmented unit toggle inside the Settings weight card, enabling display weight conversion and unit-based edit prompts. The preference is persisted across restarts, while internal databases preserve the canonical metrics in kilograms.
-
----
-
-## 📦 Assets
-- Built debug APK is available at [assets/app-v1.0.1.apk](assets/app-v1.0.1.apk).
-
----
-
-## Run Locally
-
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
-
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device

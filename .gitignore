@@ -18,3 +18,4 @@ local.properties
 debug.keystore
 my-upload-key.jks
 gradle-9.3.1-bin.zip
+keystore-base64.txt

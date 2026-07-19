@@ -1,0 +1,3 @@
+- Added F-Droid build flavor with no Google Play Services dependency
+- Fixed Activity Recognition to work without Play Services
+- Improved build system for multi-flavor support

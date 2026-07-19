@@ -17,9 +17,6 @@ import com.premkumar.jiwtracker.R
 import com.premkumar.jiwtracker.data.AppDatabase
 import com.premkumar.jiwtracker.data.WalkingRepository
 import com.premkumar.jiwtracker.data.WalkingSession
-import com.google.android.gms.location.ActivityRecognition
-import com.google.android.gms.location.ActivityRecognitionResult
-import com.google.android.gms.location.DetectedActivity
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -129,84 +126,17 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
     private val stepTimeTracker = java.util.Collections.synchronizedList(mutableListOf<Long>())
 
     // Activity Recognition Integration
-    private var detectedActivityType = DetectedActivity.WALKING // Default to WALKING for starting
+    private val activityRecognitionManager: IActivityRecognitionManager = ActivityRecognitionProvider.create()
     private var activeDurationSeconds = 0
-    private var isActivityRecognitionRegistered = false
-    private var isWalkingOrRunningActivity = true
 
-    private fun isActivityWalkingOrRunning(type: Int): Boolean {
-        return type == DetectedActivity.WALKING || type == DetectedActivity.RUNNING || isWalkingOrRunningActivity
-    }
-
-    private fun getActivityRecognitionPendingIntent(): PendingIntent {
-        val intent = Intent(this, WalkingForegroundService::class.java).apply {
-            action = ACTION_ACTIVITY_RECOGNITION
+    fun hasActivityRecognitionPermission(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return androidx.core.content.ContextCompat.checkSelfPermission(
+                this,
+                android.Manifest.permission.ACTIVITY_RECOGNITION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
         }
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
-        return PendingIntent.getService(this, 100, intent, flags)
-    }
-
-    private fun registerActivityRecognition() {
-        if (isActivityRecognitionRegistered) return
-        if (!hasActivityRecognitionPermission()) return
-        try {
-            val client = ActivityRecognition.getClient(this)
-            client.requestActivityUpdates(1000L, getActivityRecognitionPendingIntent())
-                .addOnSuccessListener {
-                    isActivityRecognitionRegistered = true
-                }
-                .addOnFailureListener { e ->
-                    e.printStackTrace()
-                }
-        } catch (e: SecurityException) {
-            e.printStackTrace()
-        } catch (e: Throwable) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun unregisterActivityRecognition() {
-        if (!isActivityRecognitionRegistered) return
-        try {
-            val client = ActivityRecognition.getClient(this)
-            client.removeActivityUpdates(getActivityRecognitionPendingIntent())
-                .addOnCompleteListener {
-                    isActivityRecognitionRegistered = false
-                }
-        } catch (e: Throwable) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun handleActivityRecognition(intent: Intent?) {
-        if (intent != null && ActivityRecognitionResult.hasResult(intent)) {
-            val result = ActivityRecognitionResult.extractResult(intent)
-            if (result != null) {
-                val mostProbableActivity = result.mostProbableActivity
-                if (mostProbableActivity != null) {
-                    detectedActivityType = mostProbableActivity.type
-                    android.util.Log.d("WalkingService", "Activity Recognition Update: type = $detectedActivityType")
-                }
-                
-                val probableActs = result.probableActivities
-                val walkingOrRunningProb = probableActs?.firstOrNull { 
-                    it.type == DetectedActivity.WALKING || it.type == DetectedActivity.RUNNING 
-                }
-                val stillProb = probableActs?.firstOrNull { it.type == DetectedActivity.STILL }?.confidence ?: 0
-                
-                isWalkingOrRunningActivity = if (mostProbableActivity != null && (mostProbableActivity.type == DetectedActivity.WALKING || mostProbableActivity.type == DetectedActivity.RUNNING)) {
-                    true
-                } else if (walkingOrRunningProb != null && walkingOrRunningProb.confidence > 15) {
-                    true
-                } else {
-                    !(stillProb > 85 && walkingOrRunningProb == null)
-                }
-            }
-        }
+        return true
     }
 
     override fun onCreate() {
@@ -229,7 +159,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
             ACTION_PAUSE -> pauseSession()
             ACTION_SKIP -> skipPhase()
             ACTION_STOP -> stopSession(saveToDb = true)
-            ACTION_ACTIVITY_RECOGNITION -> handleActivityRecognition(intent)
+            ACTION_ACTIVITY_RECOGNITION -> activityRecognitionManager.handleActivityRecognition(intent)
         }
         return START_STICKY
     }
@@ -271,17 +201,6 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
         }
     }
 
-    private fun hasActivityRecognitionPermission(): Boolean {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val permission = "android.permission.ACTIVITY_RECOGNITION"
-            return androidx.core.content.ContextCompat.checkSelfPermission(
-                this,
-                permission
-            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-        return true
-    }
-
     private fun startSession() {
         stopSelfJob?.cancel()
         stopSelfJob = null
@@ -318,8 +237,6 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
             initialStepsInHardware = -1
             lastCalculationStepCount = 0
             activeDurationSeconds = 0
-            detectedActivityType = DetectedActivity.WALKING
-            isWalkingOrRunningActivity = true
             synchronized(stepTimeTracker) {
                 stepTimeTracker.clear()
             }
@@ -332,7 +249,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
         
         lastHardwareStepCount = -1
         registerSensor()
-        registerActivityRecognition()
+        activityRecognitionManager.register(this)
         _currentState.value = activeState
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -378,7 +295,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
         _currentState.value = activeState
         stopTicker()
         unregisterSensor()
-        unregisterActivityRecognition()
+        activityRecognitionManager.unregister()
         updateNotification(activeState)
         speakCue("Workout paused.")
     }
@@ -397,7 +314,7 @@ class WalkingForegroundService : Service(), SensorEventListener, TextToSpeech.On
         }
         stopTicker()
         unregisterSensor()
-        unregisterActivityRecognition()
+        activityRecognitionManager.unregister()
         
         val record = activeState
         _currentState.value = ServiceState.Idle

@@ -1,0 +1,21 @@
+JIW Tracker is an open-source fitness app that implements the Shinshu University-style interval walking protocol. Alternating between slow recovery walks and fast burn walks, this scientifically-backed method helps improve cardiovascular fitness and burn calories effectively.
+
+<b>Key Features:</b>
+
+• Interval Walking Workouts: Customizable slow/fast duration cycles with configurable total cycles per session
+• Real-time Voice Coaching: Audio cues guide you through each interval phase transition
+• Step Tracking: Uses the hardware step counter sensor for accurate, battery-efficient tracking
+• Calorie Calculation: MET-based calorie burn estimation using your weight and walking speed
+• Activity Recognition: Detects walking/running activity to ensure you're active during workouts
+• Health Connect Sync: Sync completed sessions to Health Connect (steps, calories, distance, exercise data)
+• Detailed Session History: View past workouts with cadence, pace, calories, and duration data
+• Workout Dashboard: Start, pause, skip phases, or stop your interval sessions with an interactive notification
+• Customizable Settings: Configure interval timing, weight units (kg/lb), and voice preferences
+• Japanese Language Support: Full Japanese UI with translated voice cues for native speakers
+• Onboarding Wizard: Guided setup to configure your preferences on first launch
+• Light & Dark Theme: Automatic theme support based on system settings
+• Data Export: Export your walking history for personal analysis
+
+JIW Tracker respects your privacy. No account required, no data collection, and all data is stored locally on your device.
+
+This app is fully open source under the GPL v3 license and contains no proprietary tracking or ads.

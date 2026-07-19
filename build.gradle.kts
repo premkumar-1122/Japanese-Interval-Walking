@@ -4,7 +4,6 @@ plugins {
   alias(libs.plugins.kotlin.compose) apply false
   alias(libs.plugins.google.devtools.ksp) apply false
   alias(libs.plugins.roborazzi) apply false
-  alias(libs.plugins.secrets) apply false
 }
 
 tasks.register("listFiles") {

@@ -1,0 +1,20 @@
+{
+  "name": "japanese-interval-walking",
+  "version": "0.0.0-development",
+  "private": true,
+  "description": "Japanese Interval Walking Tracker - automated semantic release pipeline.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/semantic-release/semantic-release.git"
+  },
+  "scripts": {
+    "semantic-release": "semantic-release"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/github": "^11.0.3",
+    "@semantic-release/release-notes-generator": "^14.0.3",
+    "semantic-release": "^24.2.3"
+  }
+}

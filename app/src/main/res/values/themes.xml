@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
+        <!-- Light theme: white status bar with forced dark (dark-on-light) icons -->
+        <item name="android:windowLightStatusBar">true</item>
+        <!-- Light theme: light navigation bar so it doesn't inherit an unwanted accent -->
+        <item name="android:windowLightNavigationBar">true</item>
+        <!-- Explicit neutral backgrounds for system bars instead of accidental accents -->
+        <item name="android:statusBarColor">@android:color/white</item>
+        <item name="android:navigationBarColor">@android:color/white</item>
+    </style>
 </resources>

@@ -7,15 +7,15 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.premkumar.jiwtracker"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.intervalwalking.jwpfqr"
+    applicationId = "com.premkumar.jiwtracker"
     minSdk = 26
     targetSdk = 36
     versionCode = 4
-    versionName = "2.0.0"
+    versionName = (project.findProperty("versionName") as String?) ?: "2.0.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -57,6 +57,37 @@ android {
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
+// Dynamic artifact naming: jiw-tracker-v<versionName>.apk / .aab
+val versionNameValue = (project.findProperty("versionName") as String?) ?: "2.0.0"
+
+afterEvaluate {
+  tasks.named("assembleRelease") {
+    doLast {
+      val apkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
+      apkDir.listFiles { f -> f.name.endsWith(".apk") && f.name != "jiw-tracker-v${versionNameValue}.apk" }
+        ?.forEach { apk ->
+          apk.renameTo(File(apkDir, "jiw-tracker-v${versionNameValue}.apk"))
+        }
+    }
+  }
+
+  tasks.named("bundleRelease") {
+    doLast {
+      val bundleDir = layout.buildDirectory.dir("outputs/bundle/release").get().asFile
+      bundleDir.listFiles { f -> f.name.endsWith(".aab") && f.name != "jiw-tracker-v${versionNameValue}.aab" }
+        ?.forEach { aab ->
+          aab.renameTo(File(bundleDir, "jiw-tracker-v${versionNameValue}.aab"))
+        }
+    }
+  }
+}
+
+kotlin {
+  compilerOptions {
+    optIn.add("androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi")
+  }
+}
+
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
 // to match the convention used in Web projects.
 secrets {
@@ -78,6 +109,7 @@ dependencies {
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
   implementation(libs.androidx.compose.material3)
+  implementation(libs.androidx.compose.material3.windowsizeclass)
   implementation(libs.androidx.compose.ui)
   implementation(libs.androidx.compose.ui.graphics)
   implementation(libs.androidx.compose.ui.tooling.preview)

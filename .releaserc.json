@@ -1,0 +1,31 @@
+{
+  "branches": [
+    "main",
+    "master"
+  ],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {
+        "assets": [
+          {
+            "path": "app/build/outputs/apk/release/jiw-tracker-v${nextRelease.version}.apk",
+            "label": "JIW Tracker APK"
+          },
+          {
+            "path": "app/build/outputs/bundle/release/jiw-tracker-v${nextRelease.version}.aab",
+            "label": "JIW Tracker AAB"
+          }
+        ]
+      }
+    ]
+  ]
+}

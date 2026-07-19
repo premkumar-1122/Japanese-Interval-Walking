@@ -3,7 +3,6 @@ plugins {
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
-  alias(libs.plugins.secrets)
 }
 
 android {
@@ -14,19 +13,38 @@ android {
     applicationId = "com.premkumar.jiwtracker"
     minSdk = 26
     targetSdk = 36
-    versionCode = 4
-    versionName = (project.findProperty("versionName") as String?) ?: "2.0.0"
+    versionCode = 5
+    versionName = (project.findProperty("versionName") as String?) ?: "2.1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
+  flavorDimensions += "provider"
+  productFlavors {
+    create("standard") {
+      dimension = "provider"
+      isDefault = true
+    }
+    create("fdroid") {
+      dimension = "provider"
+    }
+  }
+
+  val keystorePathFromEnv = System.getenv("KEYSTORE_PATH")
+  val storePasswordFromEnv = System.getenv("STORE_PASSWORD")
+  val keyAliasFromEnv = System.getenv("KEY_ALIAS")
+  val keyPasswordFromEnv = System.getenv("KEY_PASSWORD")
+  val hasSigningEnv = keystorePathFromEnv != null && storePasswordFromEnv != null &&
+    keyAliasFromEnv != null && keyPasswordFromEnv != null
+
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD") ?: "jiwTracker2024!"
-      keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
-      keyPassword = System.getenv("KEY_PASSWORD") ?: "jiwTracker2024!"
+      if (hasSigningEnv) {
+        storeFile = file(keystorePathFromEnv)
+        storePassword = storePasswordFromEnv
+        keyAlias = keyAliasFromEnv
+        keyPassword = keyPasswordFromEnv
+      }
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -41,7 +59,9 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      if (hasSigningEnv) {
+        signingConfig = signingConfigs.getByName("release")
+      }
     }
     debug {
     }
@@ -58,28 +78,40 @@ android {
 }
 
 // Dynamic artifact naming: jiw-tracker-v<versionName>.apk / .aab
-val versionNameValue = (project.findProperty("versionName") as String?) ?: "2.0.0"
+val versionNameValue = (project.findProperty("versionName") as String?) ?: "2.1.0"
+
+fun renameApks(apkDir: java.io.File) {
+  if (!apkDir.exists()) return
+  apkDir.listFiles { f -> f.name.endsWith(".apk") && f.name != "jiw-tracker-v${versionNameValue}.apk" }
+    ?.forEach { apk ->
+      apk.renameTo(java.io.File(apkDir, "jiw-tracker-v${versionNameValue}.apk"))
+    }
+}
+
+fun renameBundles(bundleDir: java.io.File) {
+  if (!bundleDir.exists()) return
+  bundleDir.listFiles { f -> f.name.endsWith(".aab") && f.name != "jiw-tracker-v${versionNameValue}.aab" }
+    ?.forEach { aab ->
+      aab.renameTo(java.io.File(bundleDir, "jiw-tracker-v${versionNameValue}.aab"))
+    }
+}
 
 afterEvaluate {
-  tasks.named("assembleRelease") {
-    doLast {
-      val apkDir = layout.buildDirectory.dir("outputs/apk/release").get().asFile
-      apkDir.listFiles { f -> f.name.endsWith(".apk") && f.name != "jiw-tracker-v${versionNameValue}.apk" }
-        ?.forEach { apk ->
-          apk.renameTo(File(apkDir, "jiw-tracker-v${versionNameValue}.apk"))
-        }
+  tasks.matching { it.name.startsWith("assemble") && it.name.endsWith("Release") }
+    .configureEach { task ->
+      val flavor = task.name.removePrefix("assemble").removeSuffix("Release").lowercase()
+      task.doLast {
+        renameApks(layout.buildDirectory.dir("outputs/apk/${flavor}/release").get().asFile)
+      }
     }
-  }
 
-  tasks.named("bundleRelease") {
-    doLast {
-      val bundleDir = layout.buildDirectory.dir("outputs/bundle/release").get().asFile
-      bundleDir.listFiles { f -> f.name.endsWith(".aab") && f.name != "jiw-tracker-v${versionNameValue}.aab" }
-        ?.forEach { aab ->
-          aab.renameTo(File(bundleDir, "jiw-tracker-v${versionNameValue}.aab"))
-        }
+  tasks.matching { it.name.startsWith("bundle") && it.name.endsWith("Release") }
+    .configureEach { task ->
+      val flavor = task.name.removePrefix("bundle").removeSuffix("Release").lowercase()
+      task.doLast {
+        renameBundles(layout.buildDirectory.dir("outputs/bundle/${flavor}/release").get().asFile)
+      }
     }
-  }
 }
 
 kotlin {
@@ -88,18 +120,10 @@ kotlin {
   }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
-secrets {
-  propertiesFileName = ".env"
-  defaultPropertiesFileName = ".env.example"
-}
-
 // Some unused dependencies are commented out below instead of being removed.
 // This makes it easy to add them back in the future if needed.
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
-  implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   // implementation(libs.androidx.camera.camera2)
@@ -125,13 +149,12 @@ dependencies {
   implementation(libs.androidx.work.runtime)
   // implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
-  // implementation(libs.firebase.ai)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  implementation(libs.play.services.location)
+  "standardImplementation"(libs.play.services.location)
   implementation(libs.retrofit)
   implementation("androidx.browser:browser:1.8.0")
   testImplementation(libs.androidx.compose.ui.test.junit4)

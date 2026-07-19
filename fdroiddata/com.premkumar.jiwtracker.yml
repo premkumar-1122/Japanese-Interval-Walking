@@ -1,0 +1,46 @@
+Categories:
+  - Health
+  - Science & Education
+License: GPL-3.0
+AuthorName: Premkumar
+AuthorEmail: premkumar1122@gmail.com
+SourceCode: https://github.com/premkumar-1122/Japanese-Interval-Walking
+IssueTracker: https://github.com/premkumar-1122/Japanese-Interval-Walking/issues
+Changelog: https://github.com/premkumar-1122/Japanese-Interval-Walking/releases
+
+AutoName: JIW Tracker
+Description: |-
+  JIW Tracker is an open-source fitness app that implements the
+  Shinshu University-style interval walking protocol. Alternating
+  between slow recovery walks and fast burn walks, this
+  scientifically-backed method helps improve cardiovascular fitness
+  and burn calories effectively.
+
+  Key Features:
+  * Interval Walking Workouts: Customizable slow/fast duration cycles
+  * Real-time Voice Coaching: Audio cues in English and Japanese
+  * Step Tracking: Hardware step counter sensor for accuracy
+  * Calorie Calculation: MET-based burn estimation
+  * Health Connect Sync: Sync to Health Connect
+  * Detailed Session History: Track cadence, pace, calories, duration
+  * Japanese Language Support: Full Japanese UI and voice cues
+  * Light & Dark Theme: Automatic system theme support
+  * No account required, no data collection, fully offline
+
+RepoType: git
+Repo: https://github.com/premkumar-1122/Japanese-Interval-Walking.git
+
+Builds:
+  - versionName: '2.1.0'
+    versionCode: 5
+    commit: v2.1.0
+    subdir: app
+    gradle:
+      - fdroid
+
+AllowedAPKSigningKeys: 046e269cfdb4816b4ef3d554a63de6be063e40008b524c04397d3b04315eaccd
+
+AutoUpdateMode: Version v%v
+UpdateCheckMode: Tags
+CurrentVersion: '2.1.0'
+CurrentVersionCode: 5

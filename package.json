@@ -5,7 +5,7 @@
   "description": "Japanese Interval Walking Tracker - automated semantic release pipeline.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/semantic-release/semantic-release.git"
+    "url": "https://github.com/premkumar-1122/Japanese-Interval-Walking.git"
   },
   "scripts": {
     "semantic-release": "semantic-release"

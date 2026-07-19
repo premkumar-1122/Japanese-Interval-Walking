@@ -56,17 +56,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          OUTPUT=$(npx semantic-release --dry-run 2>&1)
-          echo "$OUTPUT"
-          VERSION=$(echo "$OUTPUT" | grep -oE 'next release version is "[0-9]+\.[0-9]+\.[0-9]+"' | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-          if [ -z "$VERSION" ]; then
-            echo "No release required by semantic-release."
+          npx semantic-release --dry-run 2>&1
+          # Read the NEXT_RELEASE_VERSION written by @semantic-release/exec verifyReleaseCmd
+          VERSION=$(grep -oE '^NEXT_RELEASE_VERSION=.+' "$GITHUB_OUTPUT" | cut -d= -f2 || true)
+          if [ -n "$VERSION" ]; then
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No release required."
             echo "release_needed=false" >> "$GITHUB_OUTPUT"
-            exit 0
           fi
-          echo "Calculated next version: $VERSION"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "release_needed=true" >> "$GITHUB_OUTPUT"
 
       - name: Build Release APK & AAB
         if: steps.version.outputs.release_needed == 'true'

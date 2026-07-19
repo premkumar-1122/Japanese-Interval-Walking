@@ -78,6 +78,14 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleRelease :app:bundleRelease -PversionName=${{ steps.version.outputs.version }}
 
+      - name: List build output files
+        if: steps.version.outputs.release_needed == 'true'
+        run: |
+          echo "=== APK Outputs ==="
+          ls -la app/build/outputs/apk/release/
+          echo "=== AAB Outputs ==="
+          ls -la app/build/outputs/bundle/release/
+
       - name: Run semantic-release
         if: steps.version.outputs.release_needed == 'true'
         env:
@@ -86,4 +94,4 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: npx semantic-release
+        run: npx semantic-release 2>&1

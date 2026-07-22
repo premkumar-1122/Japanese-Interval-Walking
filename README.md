@@ -69,3 +69,40 @@ cd Japanese-Interval-Walking
 
 # Or build the F-Droid–compatible flavor (no proprietary dependencies)
 ./gradlew assembleFdroidDebug
+```
+
+The signed release build and distribution bundle are produced automatically by CI — see [Releases](#releases) below.
+
+## Releases
+
+JIW Tracker uses a **tag-triggered GitHub Actions pipeline** (`.github/workflows/release.yml`). Pushing a `vX.Y.Z` tag to `main` automatically:
+
+1. Checks out the code and sets up JDK 17
+2. Decodes the signing keystore from a sealed GitHub secret
+3. Builds a **signed APK** and **AAB** via Gradle
+4. Generates release notes from conventional commits
+5. Creates a GitHub Release with both artifacts attached
+
+The project has shipped 7 releases, the latest being **v2.1.2**.
+
+| Resource | What it covers |
+|---|---|
+| [`docs/CI-CD.md`](docs/CI-CD.md) | Full pipeline architecture and required secrets |
+| [`SKILL.md`](SKILL.md) | Step-by-step release runbook for maintainers |
+| [`CHANGELOG.md`](CHANGELOG.md) | Detailed per-version changelog |
+
+## Contributing
+
+JIW Tracker started as a personal project and has grown into something I'm proud to share. Whether you want to fix a typo, add a new feature, improve localization, or tighten the calorie model — your contribution is welcome.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-idea`)
+3. Commit with [conventional commit](https://www.conventionalcommits.org/) messages
+4. Open a Pull Request
+
+No CLA, no bureaucracy — just good code and thoughtful design.
+
+## License
+
+This project is released under the [GNU General Public License v3.0](LICENSE).
+

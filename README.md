@@ -1,58 +1,71 @@
-# JIW Tracker (Japanese Interval Walking Tracker)
+# JIW Tracker
 
-An advanced, premium scientific fitness tracker designed to help users execute 信州大学 (Shinshu University) style Interval Walking. The app manages and schedules interval profiles, calculates precise metabolic calorie burns based on walking speeds (easy stroll vs. brisk walk) and body metrics, and syncs seamlessly with Android Health Connect.
+**Precision fitness tracking for the Shinshu University interval-walking method.**
 
----
+![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
+![Latest Release](https://img.shields.io/github/v/release/premkumar-1122/Japanese-Interval-Walking?display_name=tag)
+![Kotlin](https://img.shields.io/badge/Kotlin-100%25-7F52FF?logo=kotlin&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)
+![Min SDK](https://img.shields.io/badge/Min%20SDK-26-FF69B4?logo=android&logoColor=white)
 
-## 🛠️ Releasing & CI/CD
+## What is this?
 
-Releases are produced by the tag-triggered GitHub Actions workflow (`.github/workflows/release.yml`).
-Cutting a release, required secrets, and the agent runbook live in:
+Researchers at [Shinshu University (信州大学)](https://www.shinshu-u.ac.jp/) demonstrated that alternating between a brisk walk and an easy stroll — in precisely timed intervals — produces measurable metabolic benefits beyond steady-pace walking. JIW Tracker puts that protocol into your pocket: you define the interval profile, and the app guides you through each segment in real time with live calorie tracking based on your body metrics and walking speed. Every session syncs to Android Health Connect so your walking data lives alongside the rest of your health ecosystem.
 
-- **[SKILL.md](./SKILL.md)** — step-by-step runbook for creating a release (agents/maintainers).
-- **[docs/CI-CD.md](./docs/CI-CD.md)** — pipeline overview, triggers, and required secrets.
+## Features
 
-To ship a new version: bump `versionCode`/`versionName` in `app/build.gradle.kts`, push `main`,
-then push a `vX.Y.Z` tag. CI builds the signed APK + AAB and publishes the GitHub release automatically.
+### Tracking & Science
 
----
+- **Interval profile scheduling** — define fast-walk and easy-stroll durations that match the Shinshu protocol, then let the app guide you segment by segment
+- **Metabolic calorie engine** — calories are calculated from actual walking speed and your personal body metrics, not generic per-minute estimates
+- **Segmented session HUD** — a live, animated heads-up display progresses through each interval so you always know which phase you're in and what's next
 
-## 🚀 Release v1.0.2 (Feature Release)
+### Health Connect
 
-This release introduces a fully-featured onboarding flow with Jetpack DataStore persistence, segmented workout cycle tracking, and light mode visual enhancements.
+- **One-tap sync to Android Health Connect** — walking sessions, calories burned, and step data flow directly into your unified health record alongside apps like Google Fit and Samsung Health
 
-### ✨ New Features & Key Additions
-1. **Interactive Onboarding Wizard:**
-   - Designed a multi-step introduction flow (`OnboardingScreen`) to guide users through feature explanations (Steps, Metabolic Insights, Calorie burning equations).
-   - Collects initial user metrics (body weight calibration, weekly walk goals) to customize calculation models.
-   - Integrated live permission checks and requests for physical Activity Recognition, System Notifications, and Android Health Connect permissions directly in-app.
-2. **DataStore Persistence Layer:**
-   - Created `OnboardingPrefs` utilizing Jetpack DataStore for thread-safe, reactive key-value storage.
-   - Persists onboarding status, user weight, weekly walk goal, and session seeding configuration across application restarts.
-3. **Advanced Session HUD Segmenting:**
-   - Replaced continuous progress bars with a discrete Segmented Progress Bar during active interval walks.
-   - Animating completed cycles (high-intensity fast walk segments vs easy strolls) and features a pulse animation on the active segment.
-4. **Light Mode & Accessibility Polish:**
-   - Extended the CarbonBlack/MinimalLight theme to HUD metrics and action buttons (Play, Pause, Stop, Skip).
-   - Standardized icons to use auto-mirrored variants where appropriate.
+### UX & Personalization
 
----
+- **Interactive onboarding wizard** — collects your body weight and weekly walking goals on first launch so calorie math is accurate from session one
+- **kg / lb unit toggle** — works in whichever system you prefer, with instant conversion
+- **Dark & light themes** — choose between *CarbonBlack* (dark) and *MinimalLight* (light) to match your environment
+- **Consumer-friendly copy** — every label and prompt is written for the person using it, not the engineer who built it
 
-## 🚀 Release v1.0.1 (Minor Release)
+## Screenshots
 
-This release implements targeted UX bug fixes to improve navigation flow, reduce clinical jargon, and add weight metric configurations.
+| Choose Your workout | Live Session | Dashboard |
+|:---:|:---:|:---:|
+| ![Train](screenshots/train.png) | ![Session HUD](screenshots/fast_walk.png) | ![Dashboard](screenshots/dashboard.png) |
 
-### 🛠️ Bug Fixes & UX Enhancements
-1. **Health Connect Sync Consolidation:** Removed duplicate sync cards and stats from the Settings screen. Users now see a consolidated `"Connected"` status indicator and a `"Manage Sync"` link redirecting them directly to the **Dashboard** stats screen where sync details reside.
-2. **Safe History Deletion (Danger Zone protection):** 
-   - Swapped the prominent, full-width red filled delete button in settings with a smaller, outlined button.
-   - Added a confirmation `AlertDialog` overlay to prevent accidental profile or session database deletion.
-3. **Approachable Wording (Clinical Copy Removal):** Rewrote clinical, stiff, and enterprise-sounding copy into consumer-friendly alternatives:
-   - `SYSTEM PREFERENCES` → `Settings`
-   - `ATHLETE MOTIVATION ALERTS` → `Reminders`
-   - `CONNECTION PERFORMANCE` → `Sync Status`
-   - `INTERACTIVE SONIC CUES` → `Sounds & Voice`
-   - `ATHLETE DASHBOARD` → `Your Progress`
-   - `CUSTOM INTERVAL DEFINITION` → `Your Interval Settings`
-   - `Weight calibration` → `Weight settings`
-4. **Weight Unit Toggle Support:** Added an interactive `kg` / `lb` segmented unit toggle inside the Settings weight card, enabling display weight conversion and unit-based edit prompts. The preference is persisted across restarts, while internal databases preserve the canonical metrics in kilograms.
+<details>
+<summary>More screenshots</summary>
+
+| Settings | Theme Toggle | Health Connect |
+|:---:|:---:|:---:|
+| ![Settings](screenshots/settings.png) | ![Themes](screenshots/themeswitching.png) | ![Health Connect](screenshots/healthconnect.png) |
+
+</details>
+
+## Getting Started
+
+### Prerequisites
+
+| Requirement | Details |
+|---|---|
+| **Android Studio** | Latest stable recommended |
+| **JDK** | 17 (bundled with recent Android Studio) |
+| **Min SDK** | 26 (Android 8.0 Oreo) |
+| **Target SDK** | 36 |
+
+### Build
+
+```bash
+# Clone the repository
+git clone https://github.com/premkumar-1122/Japanese-Interval-Walking.git
+cd Japanese-Interval-Walking
+
+# Build the standard flavor (includes Google Play Services Location)
+./gradlew assembleStandardDebug
+
+# Or build the F-Droid–compatible flavor (no proprietary dependencies)
+./gradlew assembleFdroidDebug

@@ -1,5 +1,5 @@
 <div align="center">
-<img src="jiw.png" alt="JIW Tracker Banner" width="100%">
+<img src="jiw.png" alt="JIW Tracker Banner" width="10%">
 <h1>JIW Tracker</h1>
 <h3>Precision fitness tracking for the Shinshu University interval-walking method.</h3>
 

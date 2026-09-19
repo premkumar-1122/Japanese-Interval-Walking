@@ -1,0 +1,34 @@
+# Force LF line endings for all text files so the tree is consistent across
+# Windows / macOS / Linux clones. Without this, every checkout from a
+# Windows contributor showed up as a 9k-line phantom diff on Linux.
+* text=auto eol=lf
+
+# Explicit binary pins (defensive — `* text=auto` will sniff these correctly,
+# but pinning makes the intent obvious and prevents future contributors from
+# accidentally CRLF-ifying them).
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.apk binary
+*.aab binary
+*.jks binary
+*.keystore binary
+*.zip binary
+*.jar binary
+*.mp4 binary
+*.mp3 binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+
+# Shell scripts must be LF, not CRLF, otherwise they fail to execute on
+# Linux/macOS even when Git shows them as modified text.
+*.sh   text eol=lf
+gradlew     text eol=lf
+gradlew.bat text eol=crlf
